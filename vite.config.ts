@@ -67,9 +67,17 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       // This list is load-bearing: it scopes the 100% thresholds below. Widening
       // it starts applying those bars to components and will break CI.
-      include: ['src/lib/upi.ts', 'src/config/schema.ts', 'src/config/css-color.ts'],
+      include: [
+        'src/lib/upi.ts',
+        'src/lib/qr.ts',
+        'src/lib/amount.ts',
+        'src/config/schema.ts',
+        'src/config/css-color.ts',
+      ],
       thresholds: {
         'src/lib/upi.ts': { branches: 100, functions: 100, lines: 100, statements: 100 },
+        'src/lib/qr.ts': { branches: 100, functions: 100, lines: 100, statements: 100 },
+        'src/lib/amount.ts': { branches: 100, functions: 100, lines: 100, statements: 100 },
         'src/config/schema.ts': { branches: 100, functions: 100, lines: 100, statements: 100 },
         'src/config/css-color.ts': { branches: 100, functions: 100, lines: 100, statements: 100 },
       },

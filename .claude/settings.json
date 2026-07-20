@@ -10,7 +10,15 @@
       "Bash(pnpm test:coverage)",
       "Bash(pnpm --version)",
       "Bash(pkill -f vite)",
-      "Bash(timeout 60 pnpm check:config)"
+      "Bash(timeout 60 pnpm check:config)",
+      "Bash(pnpm vitest *)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "Bash(pnpm build *)",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__emulate"
     ]
   }
 }

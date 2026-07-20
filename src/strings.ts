@@ -17,9 +17,11 @@
  *  - `meta.title`'s `Buy {name} a chai` default is derived in the config schema,
  *    because it is needed before React mounts.
  *
- * Session 1 is scaffolding only — the page renders nothing yet, so this is a stub.
- * Sessions 2–4 fill it as components land.
+ * Entries are values or plain functions — never templates resolved at call sites,
+ * so a future i18n layer has one interception point per string.
  */
+
+import type { UpiErrorCode } from './lib/upi.ts';
 
 export const strings = {
   /** Fallback document title; the real one is derived from config `meta.title`. */
@@ -27,6 +29,79 @@ export const strings = {
   /** Shown inside <noscript> — the page needs JS to build the QR client-side. */
   noscript:
     'This page needs JavaScript to generate the UPI QR code. You can still pay by copying the UPI ID shown above into any UPI app.',
+
+  // ── Payment card ───────────────────────────────────────────────────────────
+
+  paymentCardTitle: 'Buy me a chai',
+  /**
+   * PRD §8 and DESIGN.md both require this disclosure to be present, not buried:
+   * it is the product's entire thesis and the reason the page can be free.
+   */
+  disclosure: '0% commission · straight to UPI',
+  amountGroupLabel: 'How many chai?',
+  /**
+   * A preset chip stacks its two halves, so they are two strings: the quantity
+   * ("3 ☕") above the price ("₹150"). Both are `aria-hidden` — `presetChipLabel`
+   * is what assistive tech reads, because "3 ☕" does not announce usefully.
+   */
+  presetChipCount: (chaiCount: number): string => `${chaiCount} ☕`,
+  presetChipPrice: (formattedAmount: string): string => `₹${formattedAmount}`,
+  /** Accessible name for a chip — the emoji does not read well in a screen reader. */
+  presetChipLabel: (chaiCount: number, formattedAmount: string): string =>
+    chaiCount === 1 ? `1 chai, ₹${formattedAmount}` : `${chaiCount} chai, ₹${formattedAmount}`,
+
+  customAmountLabel: 'Or enter your own amount',
+  customAmountPlaceholder: 'Amount in ₹',
+  /** P0.3: we warn above the soft cap, we never block. */
+  largeAmountWarning: 'Large amount — double-check before paying.',
+
+  messageLabel: 'Message (optional)',
+  messageHint: 'Goes into the payment note your UPI app shows.',
+  messageCounter: (used: number, max: number): string => `${used}/${max}`,
+  /** Some apps silently strip non-ASCII from `tn`; warn, never block. */
+  messageEmojiWarning: 'Some UPI apps drop emojis from the payment note.',
+
+  // ── QR ─────────────────────────────────────────────────────────────────────
+
+  qrCaption: 'Scan with any UPI app — GPay, PhonePe, Paytm, BHIM.',
+  /** DESIGN.md requires the VPA and amount as the QR's text alternative. */
+  qrAlt: (vpa: string, formattedAmount: string): string =>
+    `UPI QR code for ${vpa}, amount ₹${formattedAmount}`,
+  qrDownload: 'Save QR',
+  qrDownloadFilename: (vpa: string, rupees: number): string =>
+    `chai-${vpa.replace(/[^a-zA-Z0-9]+/g, '-')}-${rupees}.png`,
+  qrUnavailable: 'QR unavailable for this message — shorten it, or copy the UPI ID instead.',
+
+  /** The VPA stays visible next to every payment action so donors can verify it. */
+  payingTo: (formattedAmount: string, vpa: string): string =>
+    `Paying ₹${formattedAmount} to ${vpa}`,
+
+  /**
+   * The honest-UX centrepiece (DESIGN.md §After-tap): the limitation *is* the
+   * pitch. Never replace this with anything that reads as confirmation.
+   */
+  noConfirmationNote:
+    "Complete the payment in your UPI app. This page can't confirm payments — that's why it's commission-free 🙂",
+
+  amountPrompt: 'Pick an amount to get your QR code.',
 } as const;
+
+/**
+ * UI copy for `lib/upi.ts` error codes (ADR-015). The library emits stable codes
+ * plus developer-facing English; donors see these.
+ *
+ * `VPA_*` and `NAME_*` are creator misconfiguration, not donor mistakes — but the
+ * build gate (P0.1) means a deployed page cannot reach them, so the copy stays
+ * calm and points at the page owner rather than blaming the donor.
+ */
+export const upiErrorStrings: Record<UpiErrorCode, string> = {
+  VPA_REQUIRED: 'This page has no UPI ID set — the page owner needs to fix it.',
+  VPA_INVALID_FORMAT: "This page's UPI ID looks invalid — the page owner needs to fix it.",
+  NAME_REQUIRED: 'This page has no creator name set — the page owner needs to fix it.',
+  AMOUNT_NOT_FINITE: 'Enter an amount in rupees.',
+  AMOUNT_NOT_INTEGER: 'Whole rupees only — UPI apps round paise on P2P payments.',
+  AMOUNT_BELOW_MIN: 'Enter at least ₹1.',
+  AMOUNT_ABOVE_HARD_MAX: "That's above the ₹1,00,00,000 limit this page can build a QR for.",
+};
 
 export type StringKey = keyof typeof strings;
