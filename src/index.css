@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/*
+ * Theme tokens as CSS custom properties. Tailwind v4 is CSS-first: there is no
+ * tailwind.config.js and no content globs — sources are detected from the module
+ * graph. `@theme` entries become real utilities (--color-chai-accent yields
+ * text-chai-accent) *and* plain CSS variables, which is what lets the v1 widget
+ * reuse this palette without shipping Tailwind.
+ *
+ * The accent below is the default; a creator's `theme.accent` overrides it at
+ * runtime. Surfaces match the values warnings.ts contrast-checks against.
+ */
+@theme {
+  --color-chai-accent: #c4622d;
+  --color-chai-surface: #ffffff;
+  --color-chai-surface-dark: #241b14;
+}

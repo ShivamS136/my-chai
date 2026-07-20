@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm view *)",
+      "Bash(pnpm -v)",
+      "Bash(node -e ' *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm test:coverage)",
+      "Bash(pnpm --version)",
+      "Bash(pkill -f vite)",
+      "Bash(timeout 60 pnpm check:config)"
+    ]
+  }
+}

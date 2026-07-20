@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Reads the pnpm version from package.json "packageManager".
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # Single source of truth for the Node version; see also .node-version.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test with coverage
+        # Enforces 100% branch coverage on the UPI builder and the config validator.
+        run: pnpm test:coverage
+
+      - name: Validate the example config
+        run: pnpm check:config
+
+      - name: Build (Vercel / custom-domain layout)
+        run: pnpm build
+
+      - name: Build on a GitHub Pages subpath
+        # Hard rule 7: every asset path must respect Vite `base`. Building the
+        # subpath layout in CI is what stops an absolute path shipping.
+        run: BASE_PATH=/buy-me-a-chai/ pnpm build
+
+      - name: Assert subpath assets are actually rewritten
+        run: |
+          if ! grep -q 'src="/buy-me-a-chai/assets/' dist/index.html; then
+            echo "::error::dist/index.html does not reference the /buy-me-a-chai/ subpath."
+            echo "Emitted asset references were:"
+            grep -o 'src="[^"]*"\|href="[^"]*"' dist/index.html || true
+            exit 1
+          fi
+          echo "✓ assets are rewritten under the Pages subpath"
+
+      - name: Assert the placeholder guard rejects the shipped example
+        # A NEGATIVE test, and the point of the whole guard. This repo ships an
+        # example config with `yourname@bank`, which is a valid VPA *format* and so
+        # passes the schema on purpose. If this step ever succeeds, the guard has
+        # stopped protecting forks from deploying a page that points at nobody.
+        run: |
+          if pnpm check:placeholder; then
+            echo "::error::check:placeholder accepted the shipped example config — the deploy guard is broken."
+            exit 1
+          fi
+          echo "✓ the guard correctly refuses to deploy the example config"
