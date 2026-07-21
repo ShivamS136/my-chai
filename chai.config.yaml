@@ -12,25 +12,43 @@
 #     Copy-paste the ID from your UPI app; do not type it.
 
 creator:
-  name: Your Name
+  name: Shivam Sharma
   # ⚠️  YOUR UPI ID GOES HERE. Open your UPI app → profile → "UPI ID".
-  vpa: yourname@bank
-  tagline: Building open-source tools ☕
+  vpa: shivamshrm235@okaxis
+  tagline: A simple person with a big vision - using technology to build solutions that help people and make society better.
   # Drop a square image at public/avatar.png and uncomment, or delete this line for
   # an initials avatar.
-  # avatar: /avatar.png
+  avatar: /avatar.png
   bio: >-
-    I build **open-source** things and write about them. If something here saved you
-    an afternoon, a chai is a lovely way to say thanks.
+    I build **open-source** things, helpful tools, and write about them. 
+    If something here saved you an afternoon, a chai is a lovely way to say thanks.
   socials:
     - label: GitHub
-      url: https://github.com/your-handle
+      url: https://github.com/shivams136
+    - label: linkedin
+      url: https://www.linkedin.com/in/shivams136/
+    - label: dev.to
+      url: https://dev.to/shivams136
 
 # Your projects. Replace with your own, or delete the list to hide the section.
 works:
-  - title: My side project
-    description: A thing I built and wrote about
-    url: https://github.com/your-handle/my-project
+  - title: Buy Me A Chai
+    description:
+      Zero commission. Zero platform. Zero signup. Your donation page, your UPI, your host.
+      A self-hosted "Buy Me a Chai" page for Indian creators. Fork it, edit one config file, deploy free on GitHub Pages or Vercel. 
+      Donors pay you directly over UPI — scan a QR, copy your UPI ID, or one-tap into their UPI app. 
+      No middleman ever touches the money, so no one can take a cut.
+    url: https://github.com/ShivamS136/buy-me-a-chai
+  - title: Epoch Buddy
+    description:
+      A browser extension that converts epoch timestamps into human-readable dates (and vice-versa) -- from any web page selection or the extension popup.
+      Equipped with advanced tools related to epoch conversion like relative conversion, history and general like dark mode, history etc.
+    url: https://shivams136.github.io/epoch-buddy/
+  - title: Tashn
+    description:
+      A Webapp to keep scores and stats of multiple sports within your group to brag about later.
+      A lot of cool features are lined up next.
+    url: https://tashn.app/?utm_source=buy-me-a-chai
 
 chai:
   # The one-tap chips: up to 4 named tiers, each with its own rupee amount. Name them
@@ -50,7 +68,7 @@ chai:
   allowCustomAmount: true
   maxAmountWarning: 100000
   # Attached to the payment when a donor leaves the message field empty.
-  defaultNote: Chai for your work
+  defaultNote: Chai for your contribution
   allowDonorMessage: true
 
 theme:
@@ -70,9 +88,9 @@ meta:
 # VITE_POSTHOG_KEY in your host's environment variables (see docs/SETUP.md). The key
 # is injected at build time — it is never written in this file.
 #
-# analytics:
-#   provider: posthog
-#   host: https://us.i.posthog.com   # optional; default is US cloud
+analytics:
+  provider: posthog
+  host: https://eu.i.posthog.com   # optional; default is US cloud
 
 # Branding is the buy-me-a-chai template's two small links (masthead CTA + footer
 # credit) — the MAKER (who wrote the template) and their PROJECT, as opposed to the
