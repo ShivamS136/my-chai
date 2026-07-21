@@ -73,7 +73,19 @@ function chaiConfig(): Plugin {
         // An unparseable config is chai-config-validator's error to report. Failing
         // closed here is the safe default: no flag, no analytics, no bytes.
       }
-      return { define: { __CHAI_ANALYTICS__: JSON.stringify(declared) } };
+      // The canonical public demo (ADR-034): CHAI_ALLOW_PLACEHOLDER=1 is the deliberate
+      // "publish the example past the placeholder guard" signal (ADR-013), and the one
+      // build that should carry the "example only — don't send money" banner. It is set
+      // only by the demo repo's own repository variable (never inherited by a fork, never
+      // set in dev or CI), so a real creator build is always false and Rollup drops the
+      // DemoBanner from their bundle.
+      const isDemo = process.env.CHAI_ALLOW_PLACEHOLDER === '1';
+      return {
+        define: {
+          __CHAI_ANALYTICS__: JSON.stringify(declared),
+          __CHAI_DEMO__: JSON.stringify(isDemo),
+        },
+      };
     },
     resolveId(id) {
       return id === VIRTUAL_ID ? RESOLVED_VIRTUAL_ID : undefined;

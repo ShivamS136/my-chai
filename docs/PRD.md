@@ -37,7 +37,7 @@ The cost of not solving it: creators either lose a cut of small donations (where
 
 **Creator**
 - As a dev, I want to fork a template and edit one typed config file so that my page goes live without writing UI code.
-- As a creator, I want to set my chai base price and preset quantities so donors get one-tap amount choices.
+- As a creator, I want to name my own chai tiers and price each one so donors get one-tap amount choices that sound like my shop, not a form.
 - As a creator, I want a build-time check that fails on an invalid/missing VPA so I never publish a broken payment page.
 - As a creator, I want a guided "send yourself ₹1" self-test in the setup docs so a VPA typo never silently redirects donations to a stranger.
 - As a creator, I want optional analytics (page views, amount selections, pay clicks) so I can gauge interest — knowing completions can't be tracked.
@@ -57,7 +57,7 @@ The cost of not solving it: creators either lose a cut of small donations (where
 |---|---|---|
 | P0.1 | Config file (`chai.config.yaml`) drives the entire page | Zod-validated at build; build fails with a readable error on invalid VPA format, missing name, or non-positive base price |
 | P0.2 | Creator profile section | Renders name, avatar, bio (markdown subset), social links, works/projects list from config |
-| P0.3 | Chai amount selector | Preset chips (e.g. 1/3/5 chai × base price) + custom amount input; amount ≥ ₹1; ₹1,00,000 soft cap with warning copy |
+| P0.3 | Chai amount selector | Up to 4 named preset chips (label + explicit ₹ amount, e.g. "Cutting chai" ₹20) + custom amount input; amount ≥ ₹1; ₹1,00,000 soft cap with warning copy |
 | P0.4 | Donor message field | Optional; sanitized; max 60 chars (UPI `tn` limits); default note from config used when empty |
 | P0.5 | Live UPI QR | Client-side QR of `upi://pay?...` regenerated on every amount/note change; downloadable as PNG |
 | P0.6 | UPI deeplink button (mobile only) | Fires `upi://` intent; visible only on mobile UAs; labeled honestly ("works on most UPI apps") |

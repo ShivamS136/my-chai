@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import { Bio } from './components/Bio.tsx';
+import { DemoBanner } from './components/DemoBanner.tsx';
 import { Footer } from './components/Footer.tsx';
 import { Masthead } from './components/Masthead.tsx';
 import { PaymentCard } from './components/PaymentCard.tsx';
@@ -38,6 +39,8 @@ export default function App(): JSX.Element {
       >
         {strings.skipToPayment}
       </a>
+
+      {__CHAI_DEMO__ && <DemoBanner />}
 
       <Masthead />
 

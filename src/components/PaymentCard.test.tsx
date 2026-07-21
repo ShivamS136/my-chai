@@ -15,10 +15,16 @@ const { track } = await import('../analytics/index.ts');
  * Fixtures go through the real schema rather than hand-built objects, so these
  * tests exercise the same defaults a deployed page gets.
  */
+const PRESETS = [
+  { label: 'Cutting chai', amount: 20, emoji: '☕' },
+  { label: 'Chai for me and you', amount: 50, emoji: '☕☕' },
+  { label: '2 chai + chips', amount: 100, emoji: '☕☕🍟' },
+];
+
 const configFor = (overrides: Partial<ChaiConfigInput> = {}): ChaiConfig =>
   chaiConfigSchema.parse({
     creator: { name: 'Shivam Sharma', vpa: 'shivam@okaxis' },
-    chai: { basePrice: 50, presets: [1, 3, 5], defaultNote: 'Chai for your work' },
+    chai: { presets: PRESETS, defaultNote: 'Chai for your work' },
     ...overrides,
   });
 
@@ -35,55 +41,86 @@ const qrAltAmount = (): string => {
   return alt.replace(/^.*amount ₹/, '');
 };
 
-const chip = (chaiCount: number): HTMLElement =>
-  screen.getByRole('radio', { name: new RegExp(`^${chaiCount} chai,`) });
+/**
+ * Chips are addressed by the label a donor actually reads. A function matcher,
+ * not a regex: tier names are creator prose and "2 chai + chips" is a valid one.
+ */
+const chip = (label: string): HTMLElement =>
+  screen.getByRole('radio', { name: (name: string) => name.startsWith(`${label},`) });
 
 afterEach(() => {
   vi.mocked(track).mockClear();
 });
 
 describe('PaymentCard — amount selection (P0.3)', () => {
-  it('selects one chai by default and shows its QR', () => {
+  it('selects the cheapest chip by default and shows its QR', () => {
     setup();
-    expect(chip(1)).toBeChecked();
-    expect(qrAltAmount()).toBe('50');
+    expect(chip('Cutting chai')).toBeChecked();
+    expect(qrAltAmount()).toBe('20');
   });
 
-  it('renders one chip per configured preset', () => {
+  it('renders one chip per configured preset, named and priced', () => {
     setup();
     expect(screen.getAllByRole('radio')).toHaveLength(3);
-    expect(chip(3)).toHaveAccessibleName('3 chai, ₹150');
+    expect(chip('Chai for me and you')).toHaveAccessibleName('Chai for me and you, ₹50');
+    expect(screen.getByText('2 chai + chips')).toBeInTheDocument();
   });
 
   it('regenerates the QR when a different preset is chosen', async () => {
     const user = setup();
-    await user.click(chip(5));
-    expect(chip(5)).toBeChecked();
-    expect(chip(1)).not.toBeChecked();
-    expect(qrAltAmount()).toBe('250');
+    await user.click(chip('2 chai + chips'));
+    expect(chip('2 chai + chips')).toBeChecked();
+    expect(chip('Cutting chai')).not.toBeChecked();
+    expect(qrAltAmount()).toBe('100');
+  });
+
+  it('shows the emoji as decoration, keeping it out of the accessible name', () => {
+    setup();
+    expect(screen.getByText('☕☕🍟')).toBeInTheDocument();
+    // A screen reader hears the label and the price, never "coffee coffee fries".
+    expect(chip('2 chai + chips')).toHaveAccessibleName('2 chai + chips, ₹100');
+  });
+
+  it('renders a chip with no emoji at all', () => {
+    setup({ chai: { presets: [{ label: 'Plain', amount: 20 }] } });
+    expect(chip('Plain')).toHaveAccessibleName('Plain, ₹20');
+    expect(screen.queryByText('☕')).not.toBeInTheDocument();
+  });
+
+  it('orders the chips by amount whatever order the creator wrote them in', () => {
+    setup({
+      chai: {
+        presets: [
+          { label: 'Big', amount: 100 },
+          { label: 'Small', amount: 20 },
+        ],
+      },
+    });
+    expect(screen.getAllByRole('radio').map((r) => r.getAttribute('value'))).toEqual(['20', '100']);
+    expect(chip('Small')).toBeChecked();
   });
 
   it('moves selection with arrow keys, as a radiogroup must (DESIGN.md a11y)', async () => {
     const user = setup();
     await user.tab();
-    expect(chip(1)).toHaveFocus();
+    expect(chip('Cutting chai')).toHaveFocus();
 
     await user.keyboard('{ArrowRight}');
-    expect(chip(3)).toBeChecked();
-    expect(qrAltAmount()).toBe('150');
+    expect(chip('Chai for me and you')).toBeChecked();
+    expect(qrAltAmount()).toBe('50');
 
     // Wrapping is part of the native radiogroup contract.
     await user.keyboard('{ArrowRight}{ArrowRight}');
-    expect(chip(1)).toBeChecked();
+    expect(chip('Cutting chai')).toBeChecked();
   });
 
   it('exposes exactly one tab stop for the whole group', async () => {
     const user = setup();
     await user.tab();
-    expect(chip(1)).toHaveFocus();
+    expect(chip('Cutting chai')).toHaveFocus();
     await user.tab();
-    expect(chip(3)).not.toHaveFocus();
-    expect(chip(5)).not.toHaveFocus();
+    expect(chip('Chai for me and you')).not.toHaveFocus();
+    expect(chip('2 chai + chips')).not.toHaveFocus();
   });
 
   it('pays the custom amount once one is typed', async () => {
@@ -95,7 +132,7 @@ describe('PaymentCard — amount selection (P0.3)', () => {
   it('deselects every chip while a custom amount is active', async () => {
     const user = setup();
     await user.type(screen.getByLabelText(strings.customAmountLabel), '777');
-    for (const count of [1, 3, 5]) expect(chip(count)).not.toBeChecked();
+    for (const preset of PRESETS) expect(chip(preset.label)).not.toBeChecked();
   });
 
   it('clears the custom amount when a chip is chosen again', async () => {
@@ -103,9 +140,9 @@ describe('PaymentCard — amount selection (P0.3)', () => {
     const user = setup();
     const custom = screen.getByLabelText(strings.customAmountLabel);
     await user.type(custom, '777');
-    await user.click(chip(3));
+    await user.click(chip('Chai for me and you'));
     expect(custom).toHaveValue('');
-    expect(qrAltAmount()).toBe('150');
+    expect(qrAltAmount()).toBe('50');
   });
 
   it('ignores non-numeric input rather than rejecting the keystroke', async () => {
@@ -141,13 +178,13 @@ describe('PaymentCard — amount selection (P0.3)', () => {
   });
 
   it('hides the custom field when the creator disables it', () => {
-    setup({ chai: { basePrice: 50, allowCustomAmount: false } });
+    setup({ chai: { presets: PRESETS, allowCustomAmount: false } });
     expect(screen.queryByLabelText(strings.customAmountLabel)).not.toBeInTheDocument();
   });
 
   it('shows the resolved amount and VPA together so donors can verify', () => {
     setup();
-    expect(screen.getByText(strings.payingTo('50', 'shivam@okaxis'))).toBeInTheDocument();
+    expect(screen.getByText(strings.payingTo('20', 'shivam@okaxis'))).toBeInTheDocument();
   });
 });
 
@@ -206,7 +243,7 @@ describe('PaymentCard — donor message (P0.4)', () => {
   });
 
   it('hides the message field when the creator disables it', () => {
-    setup({ chai: { basePrice: 50, allowDonorMessage: false } });
+    setup({ chai: { presets: PRESETS, allowDonorMessage: false } });
     expect(screen.queryByLabelText(strings.messageLabel)).not.toBeInTheDocument();
   });
 });
@@ -214,11 +251,11 @@ describe('PaymentCard — donor message (P0.4)', () => {
 describe('PaymentCard — analytics (P0.11)', () => {
   it('reports a preset chip immediately, as one deliberate act', async () => {
     const user = setup();
-    await user.click(chip(3));
+    await user.click(chip('Chai for me and you'));
 
     expect(track).toHaveBeenCalledExactlyOnceWith({
       name: 'amount_selected',
-      amount: 150,
+      amount: 50,
       preset: true,
     });
   });
@@ -267,7 +304,7 @@ describe('PaymentCard — analytics (P0.11)', () => {
   it('never puts the donor message into an event (hard rule 5)', async () => {
     const user = setup();
     await user.type(screen.getByLabelText(strings.messageLabel), 'from Ananya');
-    await user.click(chip(5));
+    await user.click(chip('2 chai + chips'));
 
     expect(JSON.stringify(vi.mocked(track).mock.calls)).not.toContain('Ananya');
   });

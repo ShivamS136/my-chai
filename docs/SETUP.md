@@ -20,7 +20,11 @@ Open the file in GitHub's web editor (press `.` in your repo for the browser VS 
 - `creator.vpa` — **your UPI ID.** Copy-paste it from your UPI app; don't type it. This is where money goes. The build rejects malformed IDs but cannot know if a valid-looking ID is *yours* — that's what Step 5 is for.
 - `creator.name`, `tagline`, `bio` — who you are, why chai.
 - `works` — link your projects (or delete the list to hide the section).
-- `chai.basePrice` — price of one chai in ₹ (₹50 is a good default).
+- `chai.presets` — your one-tap amounts, up to four. Each has a `label` and an `amount` in ₹, and
+  the label is what sells it: "Cutting chai · ₹20" gets tapped far more often than a bare number.
+  Each tier also takes an optional `emoji` (up to 3, e.g. `☕☕🍟`) shown above the label — pure
+  decoration, so screen readers skip it and a chip without one is perfectly fine.
+  The shipped ladder (₹20 / ₹50 / ₹100) is a fine starting point — rename it to your own shop.
 - Drop your photo at `public/avatar.png` (square, ≥ 256px) or remove the `avatar` line for an initials avatar.
 
 Commit to `main`. Full field reference: [CONFIG.md](./CONFIG.md).
@@ -67,6 +71,31 @@ Two things to know:
 - It only ever changes template code, never your config or your assets — your UPI ID is safe.
 - If the template changed its own GitHub Actions files, the PR **can't** include those (GitHub blocks automated edits to workflows); the PR lists them so you can copy them across by hand if you want.
 - If you've edited component source yourself (say, to remove the footer links), those files get the template's version back. That path is for creators who only edit config; if you're editing code, you'll want to resolve those merges yourself.
+
+## Optional: the template's own two links (`branding`)
+Your page carries two small credits to the project that made it — a **Create your support page**
+CTA in the masthead, and **Powered by buy-me-a-chai** / **Support {maker}** in the footer. They are
+the only ask of a free, commission-free project, so please keep them if you can.
+
+They are **config, not code**. Everything about them — the maker's name, their support URL, the
+repo and template URLs — lives in the commented-out `branding` block at the bottom of
+`chai.config.yaml`. Uncomment it and edit to point them at yourself (useful if you are re-templating
+this for your own community). Left alone, they inherit the template author's values and stay current
+when you pull template updates.
+
+```yaml
+branding:
+  maker:                              # who wrote the template
+    name: Your Name
+    supportUrl: https://buymeacoffee.com/your-handle
+  project:                            # the template repo itself
+    name: my-chai-page
+    repoUrl: https://github.com/your-handle/my-chai-page
+    templateUrl: https://github.com/your-handle/my-chai-page/generate
+```
+
+Removing the links entirely is a source edit, in `Masthead.tsx` / `Footer.tsx` — deliberately not a
+config flag (ADR-026, ADR-032). The code is public; that choice is yours to make on purpose.
 
 ## Adding the link to your stuff
 - GitHub profile README / repo READMEs: `[☕ Buy me a chai](https://your-page-url)`

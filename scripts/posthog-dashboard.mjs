@@ -129,7 +129,7 @@ const INSIGHTS = [
   },
   {
     name: 'Popular amounts',
-    description: 'Which amounts donors select. Use this to tune basePrice and presets.',
+    description: 'Which amounts donors select. Use this to tune your chai.presets tiers.',
     query: trends([ev('amount_selected', { math: 'total' })], {
       trendsFilter: { display: 'ActionsBarValue' },
       breakdownFilter: { breakdown: 'amount', breakdown_type: 'event' },

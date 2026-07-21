@@ -38,17 +38,17 @@ export const strings = {
    * it is the product's entire thesis and the reason the page can be free.
    */
   disclosure: '0% commission · straight to UPI',
-  amountGroupLabel: 'How many chai?',
+  amountGroupLabel: 'Pick a chai',
   /**
-   * A preset chip stacks its two halves, so they are two strings: the quantity
-   * ("3 ☕") above the price ("₹150"). Both are `aria-hidden` — `presetChipLabel`
-   * is what assistive tech reads, because "3 ☕" does not announce usefully.
+   * A preset chip stacks two halves: the creator's tier name ("Cutting chai",
+   * straight from `chai.presets[].label` — config, so not a string in this file)
+   * above the price ("₹20"). Both are `aria-hidden`; `presetChipLabel` is what
+   * assistive tech reads, because the two visual lines announce as one run-on.
    */
-  presetChipCount: (chaiCount: number): string => `${chaiCount} ☕`,
   presetChipPrice: (formattedAmount: string): string => `₹${formattedAmount}`,
-  /** Accessible name for a chip — the emoji does not read well in a screen reader. */
-  presetChipLabel: (chaiCount: number, formattedAmount: string): string =>
-    chaiCount === 1 ? `1 chai, ₹${formattedAmount}` : `${chaiCount} chai, ₹${formattedAmount}`,
+  /** Accessible name for a chip — the creator's label, then what it costs. */
+  presetChipLabel: (label: string, formattedAmount: string): string =>
+    `${label}, ₹${formattedAmount}`,
 
   customAmountLabel: 'Or enter your own amount',
   customAmountPlaceholder: 'Amount in ₹',
@@ -162,6 +162,19 @@ export const strings = {
   referredVia: (source: string): string => `Referred via ${source}`,
   /** Always-disclosed (DESIGN.md §Copy): where the money actually goes. */
   footerDisclosure: "Payments go directly to the creator's UPI. No middleman, no fees.",
+
+  // ── Demo banner (ADR-034) ────────────────────────────────────────────────────
+
+  /**
+   * Shown only on the canonical public demo, which publishes the *example* config
+   * past the placeholder guard (ADR-013). It states plainly that the page is an
+   * example and its UPI ID is not a real payment target — ADR-008's payment-honesty
+   * rule applied to the demo. Rendered behind the build-time `__CHAI_DEMO__` gate, so
+   * it never reaches a real creator's page.
+   */
+  demoBanner: "Live demo · example page — don't send money.",
+  /** CTA in the demo banner: a visitor can spin up their own from the template. */
+  demoBannerCta: 'Make your own ↗',
 } as const;
 
 /**

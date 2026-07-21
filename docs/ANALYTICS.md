@@ -66,7 +66,7 @@ Eight tiles, designed around three creator questions: *is anyone visiting? are t
 | 3 | Intent funnel | Funnel: `page_view` → `amount_selected` → `pay_clicked` (7-day window, per user) | The core conversion view | Last step = intent, not payment |
 | 4 | Pay clicks by method | Trend (bar), `pay_clicked` broken down by `method` | Tells you if deeplink or copy dominates → informs your CTA placement | High `copy_vpa` share on mobile ≈ deeplinks failing for your donors |
 | 5 | Amount interest (₹) | Trend, SUM of `amount` on `pay_clicked`, weekly | "Amount impressions" | **Not revenue.** Compare against your actual UPI statement |
-| 6 | Popular amounts | Bar, `amount_selected` broken down by `amount` (top 10) | Tune your `basePrice`/presets | |
+| 6 | Popular amounts | Bar, `amount_selected` broken down by `amount` (top 10) | Tune your `chai.presets` tiers | |
 | 7 | Preset vs custom | Pie, `amount_selected` broken down by `preset` | If custom dominates, your presets are wrong | |
 | 8 | Device mix | Bar, `page_view` by `$device_type` | Mobile-heavy? Prioritize testing the deeplink/copy flow | |
 

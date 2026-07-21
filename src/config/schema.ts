@@ -38,8 +38,8 @@ const issue = (ctx: z.RefinementCtx, message: string): void => {
 /**
  * Message style, per the CONFIG.md error block: messages are standalone sentences
  * that do NOT repeat the field path — the formatter's path column already carries
- * it. `chai.basePrice → Expected integer ≥ 1, got 0`, never
- * `chai.basePrice → chai.basePrice must be…`.
+ * it. `chai.presets[0].amount → Expected integer ≥ 1, got 0`, never
+ * `chai.presets[0].amount → chai.presets[0].amount must be…`.
  *
  * Counts and received values are interpolated because Zod's built-in `.max()` /
  * `.min()` messages are static, which is why these are all hand-rolled.
@@ -320,39 +320,92 @@ const workSchema = z.strictObject({
 // ── chai ─────────────────────────────────────────────────────────────────────
 
 /**
+ * One preset chip: a named tier at an explicit rupee amount (ADR-035).
+ *
+ * The label is what the donor reads — "Cutting chai", not "1 ☕" — so it carries
+ * the whole invitation. 24 characters is the width a third of the 480px card can
+ * hold at two lines before the chips stop looking like peers.
+ */
+const GRAPHEME_SEGMENTER = new Intl.Segmenter('en', { granularity: 'grapheme' });
+
+/**
+ * The chip's decorative glyph — "☕", "☕☕🍟".
+ *
+ * Counted in **grapheme clusters**, not code points or UTF-16 units: a single
+ * visible emoji can be five code points (ZWJ sequences) or two (flags), and a
+ * creator counts what they can see. `Intl.Segmenter` is build-time only, like the
+ * rest of this file, so nothing here reaches the browser.
+ *
+ * Purely ornamental: it is `aria-hidden` on the chip and the accessible name comes
+ * from `label` + amount, so a screen reader never hears "coffee coffee fries".
+ */
+const emojiSchema = z
+  .string()
+  .transform((v) => v.trim())
+  .superRefine((v, ctx) => {
+    if (v.length === 0) {
+      issue(ctx, 'Empty — remove the line, or put an emoji here (e.g. "☕").');
+      return;
+    }
+    if (CONTROL_CHARS_STRICT.test(v)) {
+      issue(ctx, 'Contains a line break or control character — remove it.');
+      return;
+    }
+    const glyphs = [...GRAPHEME_SEGMENTER.segment(v)].length;
+    if (glyphs > 3) {
+      issue(ctx, `Too many glyphs: ${glyphs} — 3 max, so the chip stays a chip.`);
+    }
+  });
+
+const presetSchema = z.strictObject({
+  label: line(24)
+    .describe('What the chip says — e.g. “Cutting chai”. Keep it short; it sits above the price.')
+    .superRefine((v, ctx) => {
+      if (v.length === 0) issue(ctx, 'Required — a chip with no label is a bare number.');
+    }),
+  amount: rupeeInt(1, 100_000).describe('What this chip pays, in whole rupees (e.g. 20).'),
+  emoji: emojiSchema
+    .describe(
+      'Optional glyph shown above the label — e.g. “☕” or “☕☕🍟”. 3 max, decorative only.',
+    )
+    .optional(),
+});
+
+/**
  * Presets, in order: validate items → uniqueness → length → sort.
  *
  * Sorting before the uniqueness check would hide which entry was authored twice.
- * The comparator is load-bearing: a bare `.sort()` is lexicographic, so [10,3]
- * would stay [10,3]. `.transform` only runs when no issue was added, so a failing
- * array is never silently sorted.
+ * The comparator is load-bearing: a bare `.sort()` is lexicographic, so [100, 20]
+ * would stay [100, 20]. `.transform` only runs when no issue was added, so a
+ * failing array is never silently sorted.
+ *
+ * Uniqueness is by amount, not by label: two chips at ₹50 are the same choice
+ * twice however they are named, and a donor cannot tell which one they tapped.
  */
 const presetsSchema = z
-  .array(
-    z.custom<number>().superRefine((v, ctx) => {
-      if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > 99) {
-        issue(ctx, `Must be a whole number between 1 and 99, got ${JSON.stringify(v)}.`);
-      }
-    }),
-  )
+  .array(presetSchema)
   .superRefine((arr, ctx) => {
     const seen = new Set<number>();
-    for (const n of arr) {
-      if (seen.has(n)) {
-        issue(ctx, `Duplicate amount: ${n} appears twice. Presets must be distinct.`);
+    for (const preset of arr) {
+      if (seen.has(preset.amount)) {
+        issue(ctx, `Duplicate amount: ₹${preset.amount} appears twice. Presets must be distinct.`);
         break;
       }
-      seen.add(n);
+      seen.add(preset.amount);
     }
     if (arr.length < 1) {
-      issue(ctx, 'Needs at least 1 amount (e.g. [1, 3, 5]).');
+      issue(ctx, 'Needs at least 1 preset (label + amount).');
     }
     if (arr.length > 4) {
       issue(ctx, `Has ${arr.length} entries — 4 max (the chips stop fitting at 320px).`);
     }
   })
-  .transform((arr) => [...arr].sort((a, b) => a - b))
-  .default([1, 3, 5]);
+  .transform((arr) => [...arr].sort((a, b) => a.amount - b.amount))
+  .default([
+    { label: 'Cutting chai', amount: 20, emoji: '☕' },
+    { label: 'Chai for me and you', amount: 50, emoji: '☕☕' },
+    { label: '2 chai + chips', amount: 100, emoji: '☕☕🍟' },
+  ]);
 
 /**
  * The note attached when a donor leaves the message field empty.
@@ -383,27 +436,33 @@ const defaultNoteSchema = z
   })
   .default('');
 
-const chaiSchema = z.strictObject({
-  basePrice: rupeeInt(1, 10_000).describe('Price of one chai, in whole rupees (e.g. 50).'),
-  presets: presetsSchema.describe(
-    'How many chai the one-tap chips offer, 1–4 amounts, e.g. [1, 3, 5]. Sorted automatically.',
-  ),
-  allowCustomAmount: z
-    .boolean()
-    .describe('Show the “enter your own amount” field. Default true.')
-    .default(true),
-  // A soft UI warning threshold only. It never blocks a donor (P0.3: we warn).
-  maxAmountWarning: rupeeInt(1, 10_000_000)
-    .describe('Amounts above this show a “double-check” caution — a nudge, never a block.')
-    .default(100_000),
-  defaultNote: defaultNoteSchema.describe(
-    'The payment note used when a donor leaves the message field empty. ≤ 60 characters; plain words are safest.',
-  ),
-  allowDonorMessage: z
-    .boolean()
-    .describe('Let donors attach a one-line message to the payment. Default true.')
-    .default(true),
-});
+/**
+ * Every field defaults, so the whole block is optional — `.prefault({})` rather
+ * than `.default({})`, for the same Zod v4 reason as `themeSchema`. A config with
+ * nothing but a `creator` is valid and gets the shipped chai tiers.
+ */
+const chaiSchema = z
+  .strictObject({
+    presets: presetsSchema.describe(
+      'The one-tap chips: 1–4 named tiers, each a label and a rupee amount. Sorted by amount automatically.',
+    ),
+    allowCustomAmount: z
+      .boolean()
+      .describe('Show the “enter your own amount” field. Default true.')
+      .default(true),
+    // A soft UI warning threshold only. It never blocks a donor (P0.3: we warn).
+    maxAmountWarning: rupeeInt(1, 10_000_000)
+      .describe('Amounts above this show a “double-check” caution — a nudge, never a block.')
+      .default(100_000),
+    defaultNote: defaultNoteSchema.describe(
+      'The payment note used when a donor leaves the message field empty. ≤ 60 characters; plain words are safest.',
+    ),
+    allowDonorMessage: z
+      .boolean()
+      .describe('Let donors attach a one-line message to the payment. Default true.')
+      .default(true),
+  })
+  .prefault({});
 
 // ── theme ────────────────────────────────────────────────────────────────────
 
@@ -509,8 +568,11 @@ const metaSchema = z
  * that one link.
  *
  * The links themselves live in `Masthead.tsx` / `Footer.tsx`; deleting them is still
- * a source edit, deliberately (ADR-026). This block supersedes the old
- * `src/project.ts` constants — the values moved here so a rebrand needs no code edit.
+ * a source edit, deliberately (ADR-026).
+ *
+ * This block is where the old `MAKER` / `MAKER_PROJECT` constants went (ADR-027,
+ * superseded by ADR-032): the defaults below are the maker's, and a creator
+ * rebrands by overriding `branding` in `chai.config.yaml` — never by editing code.
  */
 const makerSchema = z
   .strictObject({
@@ -519,7 +581,7 @@ const makerSchema = z
       .default('Shivam Sharma'),
     supportUrl: httpUrl()
       .describe('The author’s own support page — Buy Me a Coffee, Ko-fi, GitHub Sponsors, …')
-      .default('https://buymeacoffee.com/shivams136'),
+      .default('https://shivams136.github.io/my-chai'),
   })
   .prefault({});
 
@@ -586,6 +648,7 @@ export type ChaiConfigInput = z.input<typeof chaiConfigSchema>;
 export type ChaiConfig = z.output<typeof chaiConfigSchema>;
 export type ChaiCreator = ChaiConfig['creator'];
 export type ChaiWork = ChaiConfig['works'][number];
+export type ChaiPreset = ChaiConfig['chai']['presets'][number];
 export type ChaiSocial = ChaiCreator['socials'][number];
 export type ChaiTheme = ChaiConfig['theme'];
 export type ChaiAnalytics = NonNullable<ChaiConfig['analytics']>;

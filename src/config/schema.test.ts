@@ -10,10 +10,12 @@ import { type ChaiConfigInput, chaiConfigSchema } from './schema.ts';
  */
 const shippedConfig = readChaiConfigRaw();
 
-/** A minimal config that parses — every other case is a mutation of this. */
+/**
+ * A minimal config that parses — every other case is a mutation of this. `creator`
+ * is the only required block: everything else, `chai` included, defaults (ADR-035).
+ */
 const base = {
   creator: { name: 'Shivam Sharma', vpa: 'shivam@okaxis' },
-  chai: { basePrice: 50 },
 } satisfies ChaiConfigInput;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test helper builds invalid shapes on purpose
@@ -52,7 +54,11 @@ describe('the shipped chai.config.yaml', () => {
 
   it('applies every documented default', () => {
     const { config } = parseConfig(shippedConfig);
-    expect(config.chai.presets).toEqual([1, 3, 5]);
+    expect(config.chai.presets).toEqual([
+      { label: 'Cutting chai', amount: 20, emoji: '☕' },
+      { label: 'Chai for me and you', amount: 50, emoji: '☕☕' },
+      { label: '2 chai + chips', amount: 100, emoji: '☕☕🍟' },
+    ]);
     expect(config.chai.allowCustomAmount).toBe(true);
     expect(config.chai.maxAmountWarning).toBe(100_000);
     expect(config.chai.allowDonorMessage).toBe(true);
@@ -63,7 +69,7 @@ describe('the shipped chai.config.yaml', () => {
     // Branding defaults to the maker's own values (ADR-032), so a fork that never
     // touches it still credits the template.
     expect(config.branding.maker.name).toBe('Shivam Sharma');
-    expect(config.branding.maker.supportUrl).toBe('https://buymeacoffee.com/shivams136');
+    expect(config.branding.maker.supportUrl).toBe('https://shivams136.github.io/my-chai');
     expect(config.branding.project.name).toBe('buy-me-a-chai');
     expect(config.branding.project.repoUrl).toBe('https://github.com/shivams136/buy-me-a-chai');
     expect(config.branding.project.templateUrl).toBe(
@@ -97,8 +103,9 @@ describe('nested object defaults', () => {
     expect(config.meta.title).toBe('Buy Shivam Sharma a chai');
   });
 
-  it('fills presets when omitted', () => {
-    expect(okOrThrow(base).chai.presets).toEqual([1, 3, 5]);
+  it('fills the chai block, presets and all, when it is omitted entirely', () => {
+    expect(okOrThrow(base).chai.presets.map((p) => p.amount)).toEqual([20, 50, 100]);
+    expect(okOrThrow(base).chai.allowCustomAmount).toBe(true);
   });
 
   it('defaults socials and works to empty arrays, never undefined', () => {
@@ -188,63 +195,94 @@ describe('creator.name', () => {
 
 // ── chai ─────────────────────────────────────────────────────────────────────
 
-describe('chai.basePrice', () => {
-  const withPrice = (basePrice: unknown) => ({ ...base, chai: { basePrice } });
-
-  it.each([1, 50, 10_000])('accepts %s', (price) => {
-    expect(okOrThrow(withPrice(price)).chai.basePrice).toBe(price);
-  });
-
-  const bad: ReadonlyArray<readonly [string, unknown, string]> = [
-    ['zero', 0, 'Expected integer ≥ 1, got 0'],
-    ['negative', -5, 'Expected integer ≥ 1, got -5'],
-    ['above the ceiling', 20_000, 'Expected integer ≤ 10000, got 20000'],
-    ['fractional', 49.5, 'whole number of rupees, got 49.5'],
-    ['a string', '50', 'Expected a number of rupees'],
-    ['NaN', Number.NaN, 'Expected a number of rupees'],
-    ['Infinity', Number.POSITIVE_INFINITY, 'finite number of rupees'],
-    ['null', null, 'Expected a number of rupees'],
-    ['undefined', undefined, 'Expected a number of rupees'],
-  ];
-
-  it.each(bad)('rejects %s', (_label, value, fragment) => {
-    expect(messagesFor(withPrice(value)).join(' ')).toContain(fragment);
-  });
-});
-
 describe('chai.presets', () => {
-  const withPresets = (presets: unknown) => ({ ...base, chai: { basePrice: 50, presets } });
+  const withPresets = (presets: unknown) => ({ ...base, chai: { presets } });
+  const tier = (label: string, amount: number) => ({ label, amount });
 
-  it('sorts ascending', () => {
-    expect(okOrThrow(withPresets([5, 1, 3])).chai.presets).toEqual([1, 3, 5]);
+  it('keeps the label and amount the creator wrote', () => {
+    expect(okOrThrow(withPresets([tier('Cutting chai', 20)])).chai.presets).toEqual([
+      { label: 'Cutting chai', amount: 20 },
+    ]);
+  });
+
+  it('sorts by amount, ascending', () => {
+    const presets = okOrThrow(
+      withPresets([tier('Big', 100), tier('Small', 20), tier('Middle', 50)]),
+    ).chai.presets;
+    expect(presets.map((p) => p.label)).toEqual(['Small', 'Middle', 'Big']);
   });
 
   it('sorts numerically, not lexicographically', () => {
-    // A bare .sort() would leave [10, 3] untouched.
-    expect(okOrThrow(withPresets([10, 3])).chai.presets).toEqual([3, 10]);
+    // A bare .sort() on the amounts would leave [100, 20] untouched.
+    const presets = okOrThrow(withPresets([tier('Big', 100), tier('Small', 20)])).chai.presets;
+    expect(presets.map((p) => p.amount)).toEqual([20, 100]);
+  });
+
+  it('trims the label, so trailing spaces never cost a creator characters', () => {
+    expect(okOrThrow(withPresets([tier('  Cutting chai  ', 20)])).chai.presets[0]?.label).toBe(
+      'Cutting chai',
+    );
   });
 
   const bad: ReadonlyArray<readonly [string, unknown, string]> = [
-    ['duplicates', [3, 3], 'Duplicate amount: 3'],
-    ['too many entries', [1, 2, 3, 4, 5], 'Has 5 entries — 4 max'],
-    ['an empty array', [], 'Needs at least 1 amount'],
-    ['zero', [0], 'between 1 and 99'],
-    ['100', [100], 'between 1 and 99'],
-    ['a fraction', [1.5], 'between 1 and 99'],
-    ['a string', ['1'], 'between 1 and 99'],
+    ['duplicate amounts', [tier('A', 50), tier('B', 50)], 'Duplicate amount: ₹50'],
+    [
+      'too many entries',
+      [tier('A', 10), tier('B', 20), tier('C', 30), tier('D', 40), tier('E', 50)],
+      'Has 5 entries — 4 max',
+    ],
+    ['an empty array', [], 'Needs at least 1 preset'],
+    ['a bare number', [20], 'Invalid input'],
+    ['an empty label', [tier('', 20)], 'Required — a chip with no label'],
+    ['a label of only spaces', [tier('   ', 20)], 'Required — a chip with no label'],
+    ['an over-long label', [tier('C'.repeat(25), 20)], 'Too long: 25 characters — 24 max'],
+    ['a multi-line label', [tier('Cutting\nchai', 20)], 'keep it on one line'],
+    ['a missing amount', [{ label: 'Cutting chai' }], 'Expected a number of rupees'],
+    ['a zero amount', [tier('Free', 0)], 'Expected integer ≥ 1, got 0'],
+    ['a negative amount', [tier('Owed', -5)], 'Expected integer ≥ 1, got -5'],
+    ['an amount above the ceiling', [tier('Huge', 200_000)], 'Expected integer ≤ 100000'],
+    ['a fractional amount', [tier('Paise', 49.5)], 'whole number of rupees, got 49.5'],
+    ['a stringly amount', [tier('Twenty', '20' as unknown as number)], 'Expected a number'],
+    ['NaN', [tier('NaN', Number.NaN)], 'Expected a number of rupees'],
+    ['Infinity', [tier('Inf', Number.POSITIVE_INFINITY)], 'finite number of rupees'],
+    ['a null amount', [tier('Null', null as unknown as number)], 'Expected a number of rupees'],
+    ['an unknown key', [{ label: 'Cutting chai', amount: 20, icon: '☕' }], 'Unknown key'],
+    ['an empty emoji', [{ ...tier('Cutting chai', 20), emoji: '  ' }], 'Empty — remove the line'],
+    [
+      'a multi-line emoji',
+      [{ ...tier('Cutting chai', 20), emoji: '☕\n☕' }],
+      'line break or control character',
+    ],
+    [
+      'more than three glyphs',
+      [{ ...tier('Whole shop', 20), emoji: '☕☕☕🍟' }],
+      'Too many glyphs: 4 — 3 max',
+    ],
   ];
 
   it.each(bad)('rejects %s', (_label, value, fragment) => {
     expect(messagesFor(withPresets(value)).join(' ')).toContain(fragment);
   });
 
+  it('keeps an emoji, and counts it by grapheme so a ZWJ sequence is one glyph', () => {
+    // "👨‍👩‍👧" is five code points but one visible glyph — a code-point cap would
+    // reject a chip the creator sees as a single icon.
+    const presets = okOrThrow(withPresets([{ ...tier('Family pack', 20), emoji: '☕👨‍👩‍👧🍟' }]))
+      .chai.presets;
+    expect(presets[0]?.emoji).toBe('☕👨‍👩‍👧🍟');
+  });
+
+  it('leaves emoji undefined when the creator omits it', () => {
+    expect(okOrThrow(withPresets([tier('Plain', 20)])).chai.presets[0]?.emoji).toBeUndefined();
+  });
+
   it('does not sort an array that failed validation', () => {
-    expect(parse(withPresets([3, 3])).success).toBe(false);
+    expect(parse(withPresets([tier('A', 50), tier('B', 50)])).success).toBe(false);
   });
 });
 
 describe('chai.defaultNote', () => {
-  const withNote = (defaultNote: unknown) => ({ ...base, chai: { basePrice: 50, defaultNote } });
+  const withNote = (defaultNote: unknown) => ({ ...base, chai: { defaultNote } });
 
   it('defaults to an empty string, which means tn is omitted', () => {
     expect(okOrThrow(base).chai.defaultNote).toBe('');
@@ -271,28 +309,26 @@ describe('chai.defaultNote', () => {
 
 describe('chai booleans', () => {
   it('rejects a non-boolean allowCustomAmount', () => {
-    expect(parse({ ...base, chai: { basePrice: 50, allowCustomAmount: 'yes' } }).success).toBe(
-      false,
-    );
+    expect(parse({ ...base, chai: { allowCustomAmount: 'yes' } }).success).toBe(false);
   });
 
   it('rejects a non-boolean allowDonorMessage', () => {
-    expect(parse({ ...base, chai: { basePrice: 50, allowDonorMessage: 1 } }).success).toBe(false);
+    expect(parse({ ...base, chai: { allowDonorMessage: 1 } }).success).toBe(false);
   });
 
   it('accepts explicit false', () => {
     const config = okOrThrow({
       ...base,
-      chai: { basePrice: 50, allowCustomAmount: false, allowDonorMessage: false },
+      chai: { allowCustomAmount: false, allowDonorMessage: false },
     });
     expect(config.chai.allowCustomAmount).toBe(false);
     expect(config.chai.allowDonorMessage).toBe(false);
   });
 
   it('validates maxAmountWarning as rupees', () => {
-    expect(
-      messagesFor({ ...base, chai: { basePrice: 50, maxAmountWarning: 0 } }).join(' '),
-    ).toContain('Expected integer ≥ 1');
+    expect(messagesFor({ ...base, chai: { maxAmountWarning: 0 } }).join(' ')).toContain(
+      'Expected integer ≥ 1',
+    );
   });
 });
 
@@ -575,7 +611,7 @@ describe('.strict() at every level', () => {
   const cases: ReadonlyArray<readonly [string, unknown]> = [
     ['root', { ...base, cretor: {} }],
     ['creator', { ...base, creator: { ...base.creator, nickname: 'x' } }],
-    ['chai', { ...base, chai: { basePrice: 50, tip: 1 } }],
+    ['chai', { ...base, chai: { tip: 1 } }],
     ['theme', { ...base, theme: { colour: 'red' } }],
     ['meta', { ...base, meta: { titel: 'x' } }],
     ['analytics', { ...base, analytics: { provider: 'posthog', secret: 'x' } }],
@@ -717,7 +753,7 @@ describe('parseConfig', () => {
   it('warns when the largest preset exceeds maxAmountWarning', () => {
     const { warnings } = parseConfig({
       ...base,
-      chai: { basePrice: 10_000, presets: [1, 3, 5], maxAmountWarning: 1000 },
+      chai: { presets: [{ label: 'Whole tea shop', amount: 5000 }], maxAmountWarning: 1000 },
     });
     expect(warnings.map((w) => w.message).join(' ')).toContain('above maxAmountWarning');
   });
@@ -725,7 +761,7 @@ describe('parseConfig', () => {
   it('warns about risky characters in the default note', () => {
     const { warnings } = parseConfig({
       ...base,
-      chai: { basePrice: 50, defaultNote: 'Chai & samosa' },
+      chai: { defaultNote: 'Chai & samosa' },
     });
     expect(warnings.map((w) => w.message).join(' ')).toContain('mangle notes');
   });
@@ -733,7 +769,7 @@ describe('parseConfig', () => {
   it('warns when no note can ever be attached', () => {
     const { warnings } = parseConfig({
       ...base,
-      chai: { basePrice: 50, defaultNote: '', allowDonorMessage: false },
+      chai: { defaultNote: '', allowDonorMessage: false },
     });
     expect(warnings.map((w) => w.message).join(' ')).toContain('No note will ever be attached');
   });
@@ -767,12 +803,9 @@ describe('parseConfig', () => {
     // 60 Devanagari code points is 60 characters to a donor and to sanitizeNote.
     const sixtyDevanagari = 'च'.repeat(60);
     expect(
-      okOrThrow({ ...base, chai: { basePrice: 50, defaultNote: sixtyDevanagari } }).chai
-        .defaultNote,
+      okOrThrow({ ...base, chai: { defaultNote: sixtyDevanagari } }).chai.defaultNote,
     ).toHaveLength(60);
-    expect(parse({ ...base, chai: { basePrice: 50, defaultNote: 'च'.repeat(61) } }).success).toBe(
-      false,
-    );
+    expect(parse({ ...base, chai: { defaultNote: 'च'.repeat(61) } }).success).toBe(false);
   });
 
   it('tells the truth about analytics when it cannot see the environment', () => {
@@ -793,7 +826,7 @@ describe('parseConfig', () => {
     const { warnings } = parseConfig({
       ...base,
       theme: { accent: '#000000', mode: 'light' },
-      chai: { basePrice: 50, defaultNote: 'Chai for your work' },
+      chai: { defaultNote: 'Chai for your work' },
     });
     expect(warnings).toEqual([]);
   });
@@ -807,7 +840,7 @@ describe('branding', () => {
     expect(branding).toEqual({
       maker: {
         name: 'Shivam Sharma',
-        supportUrl: 'https://buymeacoffee.com/shivams136',
+        supportUrl: 'https://shivams136.github.io/my-chai',
       },
       project: {
         name: 'buy-me-a-chai',

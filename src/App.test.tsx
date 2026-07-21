@@ -41,6 +41,11 @@ describe('App', () => {
     expect(
       screen.getByRole('link', { name: strings.externalLink(strings.supportMaker(maker.name)) }),
     ).toBeInTheDocument();
+
+    // The demo banner (ADR-034) is gated on the build-time __CHAI_DEMO__ flag — a
+    // literal false in every non-demo build, tests included — so it must be absent
+    // here. This is the guarantee it never shows on a real creator's page.
+    expect(screen.queryByText(strings.demoBanner)).not.toBeInTheDocument();
   });
 
   it('makes no network call at all with analytics disabled (hard rule 4)', async () => {

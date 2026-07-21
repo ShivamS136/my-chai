@@ -53,7 +53,7 @@ is free today and expensive the moment anyone has deployed.
   leave the browser bundle.
 - `.describe()` on every schema field, since the JSON Schema is now the creator's only
   autocomplete; CI asserts the committed schema still matches Zod.
-- Branding values become config with maker defaults; `src/project.ts` is removed (ADR-032).
+- Branding values become config with maker defaults; `src/project.ts` is removed — its `MAKER`/`MAKER_PROJECT` constants are now the `branding` block of `chai.config.yaml` (ADR-032).
 - `update-template.yml`: a **Run workflow** button that opens an update PR (ADR-031).
 - Rewrite CONFIG.md; SETUP.md gains an "updating" section.
 - Covers no new PRD IDs — it is a maintainability and creator-lifecycle session.

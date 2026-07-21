@@ -3,7 +3,6 @@ import {
   formatRupees,
   MAX_AMOUNT_INPUT_DIGITS,
   parseRupees,
-  presetAmount,
   sanitizeAmountInput,
 } from './amount.ts';
 
@@ -54,16 +53,6 @@ describe('parseRupees', () => {
       const parsed = parseRupees(input);
       expect(parsed === null || Number.isInteger(parsed)).toBe(true);
     }
-  });
-});
-
-describe('presetAmount', () => {
-  it.each([
-    [1, 50, 50],
-    [3, 50, 150],
-    [5, 20, 100],
-  ])('%i chai at ₹%i is ₹%i', (count, basePrice, expected) => {
-    expect(presetAmount(count, basePrice)).toBe(expected);
   });
 });
 

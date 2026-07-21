@@ -33,10 +33,20 @@ works:
     url: https://github.com/your-handle/my-project
 
 chai:
-  # Price of one chai, in whole rupees.
-  basePrice: 50
-  # How many chai the one-tap chips offer: 1 × ₹50, 3 × ₹50, 5 × ₹50.
-  presets: [1, 3, 5]
+  # The one-tap chips: up to 4 named tiers, each with its own rupee amount. Name them
+  # after something real — a donor picks "Cutting chai" far more readily than "₹20".
+  # Sorted by amount automatically, and the cheapest is selected by default.
+  # `emoji` is optional decoration (up to 3 glyphs); delete it for a text-only chip.
+  presets:
+    - label: Cutting chai
+      amount: 20
+      emoji: ☕
+    - label: Chai for me and you
+      amount: 50
+      emoji: ☕☕
+    - label: 2 chai + chips
+      amount: 100
+      emoji: ☕☕🍟
   allowCustomAmount: true
   maxAmountWarning: 100000
   # Attached to the payment when a donor leaves the message field empty.
@@ -65,9 +75,11 @@ meta:
 #   host: https://us.i.posthog.com   # optional; default is US cloud
 
 # Branding is the buy-me-a-chai template's two small links (masthead CTA + footer
-# credit). It defaults to the template author's, and updates to theirs on a template
-# pull. To make it yours, uncomment and edit — no code change needed. (Removing the
-# links entirely is still a source edit, in Masthead.tsx / Footer.tsx.)
+# credit) — the MAKER (who wrote the template) and their PROJECT, as opposed to the
+# `creator` and `works` above, which are you. It defaults to the template author's,
+# and updates to theirs on a template pull. To make it yours, uncomment and edit —
+# no code change needed, this block is the only place these values live (ADR-032).
+# (Removing the links entirely is still a source edit, in Masthead.tsx / Footer.tsx.)
 #
 # branding:
 #   maker:

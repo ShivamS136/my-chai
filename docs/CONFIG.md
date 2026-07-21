@@ -28,9 +28,17 @@ works:                                # optional, max 12; section hidden if empt
     url: https://tashn.app            # required
     image: /works/tashn.png           # optional
 
-chai:
-  basePrice: 50                       # required, integer ₹, 1–10000
-  presets: [1, 3, 5]                  # optional, 1–4 integers 1–99, default [1, 3, 5]
+chai:                                 # the whole block is optional — every field defaults
+  presets:                            # optional, 1–4 named tiers, sorted by amount
+    - label: Cutting chai             # required, ≤ 24 chars — what the chip says
+      amount: 20                      # required, integer ₹, 1–100000
+      emoji: ☕                        # optional decoration, ≤ 3 glyphs; omit for text only
+    - label: Chai for me and you
+      amount: 50
+      emoji: ☕☕
+    - label: 2 chai + chips
+      amount: 100
+      emoji: ☕☕🍟
   allowCustomAmount: true             # default true
   maxAmountWarning: 100000            # soft warn threshold, default 100000
   defaultNote: Thanks for the great work ☕   # ≤ 60 chars — used when a donor leaves the message empty
@@ -73,8 +81,7 @@ meta:
 |---|---|---|
 | `creator.vpa` | `/^[a-zA-Z0-9.\-_]{2,49}@[a-zA-Z][a-zA-Z0-9]{2,49}$/`, no spaces | **Build fails** with: `Invalid UPI ID "x". Expected format like name@bank. Double-check in your UPI app → profile.` |
 | `creator.name` | 1–50 chars, no URL | Build fails |
-| `chai.basePrice` | int, 1–10000 | Build fails |
-| `chai.presets` | 1–4 unique ints, 1–99, ascending auto-sort | Build fails |
+| `chai.presets` | 1–4 tiers, each `label` (1–24 chars) + `amount` (int ₹, 1–100000) + optional `emoji` (≤ 3 grapheme clusters, decorative — `aria-hidden`); amounts unique, sorted ascending automatically | Build fails |
 | `chai.defaultNote` | ≤ 60 code points after trim (same unit the URI builder truncates on) | Build fails (message shows char count) |
 | `theme.accent` | hex (3/4/6/8), `rgb()`/`rgba()`, or a modern colour function (`oklch()`, `lab()`, …) which is accepted but not contrast-checked. Named colours (`teal`) are **not** supported — use a hex value | Build fails |
 | accent contrast vs surface | ≥ 3:1 (WCAG 1.4.11 non-text — the accent is a fill, not body text) | **Warn only** |
@@ -84,14 +91,14 @@ meta:
 | `analytics` block absent (the default) | — | No adapter, no requests, and **no PostHog code in the build at all** — the chunk is tree-shaken out (ADR-028) |
 | `branding` | Optional; every field defaults to the maker's value (ADR-032). Overriding rebrands that link. Unknown sub-keys rejected | Build fails on a bad URL or unknown key |
 | Unknown top-level keys | `.strict()` (spelled `z.strictObject` in Zod v4) | Build fails, with a did-you-mean suggestion (catches typos like `cretor`) |
-| `chai.basePrice` × largest preset | > `maxAmountWarning` | Warn only |
+| largest `chai.presets[].amount` | > `maxAmountWarning` | Warn only |
 | Amount passed to the URI builder | whole rupees, ₹1 – ₹1,00,00,000 | Rejected by `buildUpiUri` (ADR-011). The ₹1 crore ceiling is a numeric-integrity guard, not policy: above it `toFixed(2)` goes exponential |
 
 Error output format: one line per issue, path-first, actionable — e.g.
 ```
 ✖ chai.config.yaml invalid:
-  creator.vpa    → Invalid UPI ID "shivam okaxis" (contains space)
-  chai.basePrice → Expected integer ≥ 1, got 0.
+  creator.vpa            → Invalid UPI ID "shivam okaxis" (contains space)
+  chai.presets[0].amount → Expected integer ≥ 1, got 0.
 ```
 Messages never repeat the field path — the path column carries it. Issues are sorted
 deterministically (unknown top-level keys first, since a typo'd key explains everything

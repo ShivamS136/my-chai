@@ -53,7 +53,7 @@ The masthead, grid and footer share a `max-w-[480px] lg:max-w-[1040px]` shell so
 ## Core flow & states
 
 ### Amount selection
-- Default selected: 1 chai (base price). Chips show `n ☕ · ₹amount`.
+- Default selected: the cheapest tier. Each chip stacks an optional `emoji` over the creator's label (`chai.presets[].label`, e.g. "Cutting chai") over `₹amount`. The label takes the vertical slack so the prices align across chips however the names wrap; the emoji is `aria-hidden` and the accessible name is label + price, "Cutting chai, ₹20" (ADR-035).
 - Custom input: numeric, ₹ prefix, min 1, integers only (UPI supports paise but donors think in rupees). > ₹1,00,000 shows inline caution: "Large amount — double-check before paying." (Banks apply per-txn UPI limits; we don't block, we warn.)
 - Changing amount regenerates QR + deeplink instantly. Show the resolved amount inside the pay zone header: "Paying ₹150 to `shivam@okaxis`". The VPA is always visible near payment actions — donors verify, trust increases.
 

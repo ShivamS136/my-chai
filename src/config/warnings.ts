@@ -99,7 +99,7 @@ export function collectWarnings(config: ChaiConfig): ChaiWarning[] {
     );
   }
 
-  const largestChip = Math.max(...config.chai.presets) * config.chai.basePrice;
+  const largestChip = Math.max(...config.chai.presets.map((preset) => preset.amount));
   if (largestChip > config.chai.maxAmountWarning) {
     warn(
       'chai',

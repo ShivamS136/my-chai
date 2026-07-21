@@ -47,9 +47,6 @@ export const parseRupees = (raw: string): number | null => {
   return value >= MIN_AMOUNT_RUPEES ? value : null;
 };
 
-/** Preset chip amount: `count` chai at the configured base price. */
-export const presetAmount = (chaiCount: number, basePrice: number): number => chaiCount * basePrice;
-
 /**
  * Indian digit grouping (₹1,00,000 — not ₹100,000). `Intl` handles this with
  * `en-IN`; hand-rolling the 2-3-2 lakh/crore pattern is a classic source of bugs.

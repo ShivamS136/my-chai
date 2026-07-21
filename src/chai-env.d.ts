@@ -14,6 +14,16 @@
 declare const __CHAI_ANALYTICS__: boolean;
 
 /**
+ * Whether this is the canonical public *demo* build (ADR-034): the example config
+ * published past the placeholder guard (ADR-013) with `CHAI_ALLOW_PLACEHOLDER=1`.
+ *
+ * Injected by the `chai-config` plugin's `config()` hook in vite.config.ts. A literal
+ * `false` in every real creator build — and in dev, tests and CI — so Rollup drops
+ * `DemoBanner` from their bundle, and the "example only" bar shows on the demo alone.
+ */
+declare const __CHAI_DEMO__: boolean;
+
+/**
  * The validated creator config, served by the `chai-config` plugin as a plain object
  * (ADR-030). This ambient module is the only place `ChaiConfig` reaches the browser:
  * the plugin has already run Zod in Node, so nothing here imports the schema at

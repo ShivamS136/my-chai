@@ -59,6 +59,12 @@ jobs:
           # allows writing events. `vars` is the documented home for it; `secrets` is
           # accepted too, because that is where people put anything key-shaped.
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY || secrets.VITE_POSTHOG_KEY }}
+          # Canonical-repo demo only: publish the shipped example page past the
+          # placeholder guard (ADR-013). Left UNSET in every fork — repository variables
+          # are not copied by "Use this template" — so a fork still cannot deploy the
+          # example page. Only the repo that explicitly sets CHAI_ALLOW_PLACEHOLDER=1
+          # (the canonical repo, to host the live demo) bypasses the guard.
+          CHAI_ALLOW_PLACEHOLDER: ${{ vars.CHAI_ALLOW_PLACEHOLDER }}
 
       - uses: actions/upload-pages-artifact@v4
         with:

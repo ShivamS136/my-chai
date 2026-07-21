@@ -19,7 +19,7 @@ A self-hosted "Buy Me a Chai" page for Indian creators. Fork it, edit one config
 - 🪙 **True 0% fees** — plain UPI P2P (`upi://pay` intents). We can't take a cut of what we never touch.
 - ⚡ **Live in ~15 min** — template repo → edit `chai.config.yaml` → push. [Setup guide](docs/SETUP.md).
 - 📱 **Works on every device** — live QR (desktop), UPI-app deeplink + Copy-UPI-ID (mobile), honest fallbacks where GPay/PhonePe block browser intents.
-- ☕ **Chai-priced presets** — set your base price; donors pick 1/3/5 chai or a custom amount with a personal message.
+- ☕ **Chai-priced presets** — name your own tiers ("Cutting chai · ₹20", "2 chai + chips · ₹100"); donors tap one or enter a custom amount, with a personal message.
 - 🧾 **Typed config, loud failures** — Zod-validated; a typo'd UPI ID fails the build, not your donors.
 - 📊 **Optional, privacy-first analytics** — off by default, and off means *absent*: a default build contains no tracking code to audit. Turn it on and you get three events, with autocapture and session recording switched off. No donor data, ever.
 - 🧩 **Embeddable widget** *(v1, in progress)* — `<chai-widget>` web component for any site.
