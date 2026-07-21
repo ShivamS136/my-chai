@@ -127,9 +127,10 @@ export const strings = {
   /**
    * The project wordmark in the masthead (ADR-026). This is locked branding — the
    * core identity every fork carries — as opposed to the creator's own name in the
-   * profile below it. Lowercase on purpose: it reads as a logotype, not a heading.
+   * profile below it. Set as a wordmark, not a sentence — it reads as the project's
+   * logotype rather than a heading.
    */
-  brandName: 'buy me a chai',
+  brandName: 'Buy Me A Chai',
   /** Skip link target: the payment card is the page's one job (DESIGN.md §1). */
   skipToPayment: 'Skip to payment',
   /** Label for the social-links row; the links themselves carry the brand names. */
