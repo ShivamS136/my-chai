@@ -5,9 +5,9 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    // See tsconfig.node.json: check-placeholder.mjs reaches chai.config.ts, which
-    // reads `import.meta.env` when analytics is enabled.
-    "types": ["node", "vite/client"],
+    // read-config.mts (reached via check-placeholder.mjs) uses `import.meta.url`,
+    // which needs no extra lib; node types cover node:fs and the URL global.
+    "types": ["node"],
 
     "strict": true,
     "noUncheckedIndexedAccess": true,

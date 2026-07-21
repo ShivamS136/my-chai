@@ -38,6 +38,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Check the committed JSON Schema matches the Zod schema
+        # The creator's editor autocomplete comes from chai.schema.json (ADR-030); if
+        # it drifts from src/config/schema.ts it starts lying. This regenerates and
+        # diffs, failing when the committed file is stale.
+        run: pnpm check:schema
+
       - name: Test with coverage
         # Enforces 100% branch coverage on the UPI builder and the config validator.
         run: pnpm test:coverage

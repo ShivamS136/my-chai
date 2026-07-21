@@ -1,0 +1,191 @@
+name: Update from template
+
+# Pull the latest buy-me-a-chai template into your fork — without a terminal
+# (ADR-031). Run it from the Actions tab: "Update from template" → Run workflow.
+# It merges the template, keeps YOUR chai.config.yaml and public/ untouched, checks
+# the result builds, and opens a pull request for you to review and merge.
+#
+# It never runs on a schedule: GitHub disables scheduled workflows after 60 days of
+# repository inactivity, and a donation page is inactive by design — a cron would
+# look like it works and then quietly stop. This button always works.
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream:
+        description: Template repository to pull from (owner/repo)
+        required: false
+        default: shivams136/buy-me-a-chai
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-template
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Merge the template and open a PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history: merging the template needs both sides' commits.
+          fetch-depth: 0
+          # SECURITY (do not remove): the "Check the merge" step below runs merged,
+          # upstream-controlled code (`vite build`, tests). With the default
+          # persist-credentials:true, the write-scoped GITHUB_TOKEN sits in
+          # .git/config where that untrusted code could read it and push a poisoned
+          # config to your default branch. Keeping the token OUT of the checkout means
+          # the merge code has no credential to steal; the token is used only in the
+          # final push step, by an explicit URL, after the untrusted code has run.
+          persist-credentials: false
+
+      - name: Merge the template, keeping your config and assets
+        id: merge
+        env:
+          # Passed via env, never interpolated into the script, and validated below —
+          # a workflow_dispatch input is untrusted text.
+          UPSTREAM: ${{ inputs.upstream }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          if ! printf '%s' "$UPSTREAM" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
+            echo "::error::Invalid upstream '$UPSTREAM' — expected owner/repo."
+            exit 1
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # A public repo — fetch needs no credentials (there are none persisted).
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch --no-tags --quiet upstream
+
+          BRANCH="template-update-$(date +%Y%m%d%H%M%S)"
+          git switch -c "$BRANCH"
+
+          # Prefer the template for code conflicts (-X theirs); --allow-unrelated-histories
+          # covers the first-ever merge, when the fork shares no history with the template.
+          # --no-commit lets us restore your files before the merge is recorded.
+          git merge --no-commit --allow-unrelated-histories -X theirs upstream/main || true
+
+          # Your files always win: restore them from your branch tip (still HEAD here).
+          git checkout HEAD -- chai.config.yaml 2>/dev/null || true
+          git checkout HEAD -- public 2>/dev/null || true
+
+          # Drop every template change to workflow files — modified AND newly added: the
+          # automation token is not allowed to push under .github/workflows/. Record which
+          # ones changed so we can flag them (in the PR, or the run summary if there is no PR).
+          WF_CHANGED="$(git diff --name-only HEAD upstream/main -- .github/workflows/ || true)"
+          git reset -q -- .github/workflows/ 2>/dev/null || true
+          git clean -fdq .github/workflows/ 2>/dev/null || true
+          git checkout HEAD -- .github/workflows/ 2>/dev/null || true
+
+          git add -A
+
+          # Emit the workflow-changed list unconditionally, so it is available whether or
+          # not a PR is opened.
+          {
+            echo "wf_changed<<WF_EOF"
+            echo "$WF_CHANGED"
+            echo "WF_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          has_wf_changes() { [ -n "$(printf '%s' "$WF_CHANGED" | tr -d '[:space:]')" ]; }
+
+          if git diff --cached --quiet; then
+            # Nothing to PR. But if the ONLY upstream change was workflow files, they were
+            # just stripped — so surface them in the run summary instead of silently
+            # claiming "up to date" and swallowing a workflow security fix.
+            if has_wf_changes; then
+              {
+                echo "### Template update — workflow files only"
+                echo ""
+                echo "The template changed only GitHub Actions workflow files, which this"
+                echo "automation cannot push (GitHub blocks it). Copy them across by hand:"
+                echo ""
+                echo '```'
+                echo "$WF_CHANGED"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::warning::The template updated only workflow files — see the run summary to copy them by hand."
+            else
+              echo "Already up to date with the template — nothing to do."
+            fi
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git commit --no-verify -m "chore: update from template ($UPSTREAM)"
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "base=$DEFAULT_BRANCH" >> "$GITHUB_OUTPUT"
+          # The exact commit we will publish, captured BEFORE any untrusted code runs.
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v6
+        if: steps.merge.outputs.changed == 'true'
+
+      - uses: actions/setup-node@v7
+        if: steps.merge.outputs.changed == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Check the merge still builds and passes
+        if: steps.merge.outputs.changed == 'true'
+        # Runs the merged (template + your) code — the same code you are about to adopt,
+        # from the template you chose to track. It runs with NO credential reachable: the
+        # checkout persisted none (persist-credentials:false above) and no token is in this
+        # step's environment, so untrusted code has nothing to steal and cannot push. What
+        # gets published is pinned to the SHA captured before this step, so nothing this
+        # step does to the worktree or local refs can change it. A green run is your signal
+        # the merge is safe to accept (a PR opened by the automation token does not itself
+        # trigger CI). A red run fails the job here and no PR is opened.
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm verify
+
+      - name: Push and open a pull request
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ steps.merge.outputs.branch }}
+          BASE: ${{ steps.merge.outputs.base }}
+          SHA: ${{ steps.merge.outputs.sha }}
+          WF_CHANGED: ${{ steps.merge.outputs.wf_changed }}
+          UPSTREAM: ${{ inputs.upstream }}
+        run: |
+          set -euo pipefail
+          # Push the exact verified commit by SHA (not the local branch ref) via a tokened
+          # URL. The token exists only in this step, after the untrusted verify step has
+          # finished, and pushing the pinned SHA means a tampered local ref cannot be published.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
+            "${SHA}:refs/heads/${BRANCH}"
+
+          BODY="Automated update from the template \`$UPSTREAM\`.
+
+          Your \`chai.config.yaml\` and \`public/\` were kept exactly as they are — only the template's code changed. \`pnpm verify\` passed on the merge.
+
+          Review the diff and merge when it looks good. (If you have edited component source yourself, those files were overwritten with the template's — that path is for creators who only edit config; a developer resolves their own merges.)"
+
+          if [ -n "$(printf '%s' "$WF_CHANGED" | tr -d '[:space:]')" ]; then
+            BODY="$BODY
+
+          ⚠️ The template also changed these workflow files, which this PR does **not** include — GitHub blocks automated pushes to \`.github/workflows/\`. Copy them across by hand if you want the changes:
+          \`\`\`
+          $WF_CHANGED
+          \`\`\`"
+          fi
+
+          gh pr create \
+            --base "$BASE" \
+            --head "$BRANCH" \
+            --title "Update from template ($UPSTREAM)" \
+            --body "$BODY"

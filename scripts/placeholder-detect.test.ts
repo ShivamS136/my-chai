@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import shippedConfig from '../chai.config.ts';
 import { findPlaceholders, PLACEHOLDER_NAMES, PLACEHOLDER_VPAS } from './placeholder-detect.mjs';
+import { readChaiConfigRaw } from './read-config.mts';
+
+/** The creator's YAML as shipped — the exact object the deploy guard inspects. */
+const shippedConfig = readChaiConfigRaw();
 
 describe('findPlaceholders', () => {
   const edited = { creator: { name: 'Shivam Sharma', vpa: 'shivam@okaxis' } };
@@ -52,7 +55,7 @@ describe('findPlaceholders', () => {
   });
 });
 
-describe('the shipped chai.config.ts', () => {
+describe('the shipped chai.config.yaml', () => {
   it('IS flagged — this is the guard working as designed', () => {
     // The example must build green in CI (so we know it is valid) but must never
     // deploy. If this assertion ever fails, the guard has stopped protecting forks.

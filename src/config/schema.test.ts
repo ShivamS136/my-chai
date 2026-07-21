@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import shippedConfig from '../../chai.config.ts';
+import { readChaiConfigRaw } from '../../scripts/read-config.mts';
 import { formatIssues, levenshtein, parseConfig, toConfigIssues } from './load.ts';
-import { type ChaiConfigInput, chaiConfigSchema, defineConfig } from './schema.ts';
+import { type ChaiConfigInput, chaiConfigSchema } from './schema.ts';
+
+/**
+ * The creator's YAML, read straight off disk — the exact input a fresh fork ships.
+ * Loaded through the same `read-config.mts` the build uses, so this test and the
+ * build agree on what "the shipped config" is.
+ */
+const shippedConfig = readChaiConfigRaw();
 
 /** A minimal config that parses — every other case is a mutation of this. */
 const base = {
@@ -38,7 +45,7 @@ const okOrThrow = (raw: unknown) => {
 
 // ── the shipped example ──────────────────────────────────────────────────────
 
-describe('the shipped chai.config.ts', () => {
+describe('the shipped chai.config.yaml', () => {
   it('parses successfully — a fork must start from a valid config', () => {
     expect(() => parseConfig(shippedConfig)).not.toThrow();
   });
@@ -53,6 +60,15 @@ describe('the shipped chai.config.ts', () => {
     expect(config.theme.accent).toBe('#C4622D');
     expect(config.meta.language).toBe('en');
     expect(config.analytics).toBeUndefined();
+    // Branding defaults to the maker's own values (ADR-032), so a fork that never
+    // touches it still credits the template.
+    expect(config.branding.maker.name).toBe('Shivam Sharma');
+    expect(config.branding.maker.supportUrl).toBe('https://buymeacoffee.com/shivams136');
+    expect(config.branding.project.name).toBe('buy-me-a-chai');
+    expect(config.branding.project.repoUrl).toBe('https://github.com/shivams136/buy-me-a-chai');
+    expect(config.branding.project.templateUrl).toBe(
+      'https://github.com/shivams136/buy-me-a-chai/generate',
+    );
   });
 
   it('derives meta.title from the creator name', () => {
@@ -604,7 +620,7 @@ describe('formatIssues', () => {
       'error',
     );
     expect(formatted).toBe(
-      '✖ chai.config.ts invalid:\n' +
+      '✖ chai.config.yaml invalid:\n' +
         '  creator.vpa    → Invalid UPI ID "shivam okaxis" (contains space)\n' +
         '  chai.basePrice → Expected integer ≥ 1, got 0\n',
     );
@@ -612,12 +628,12 @@ describe('formatIssues', () => {
 
   it('uses a warning header for warnings', () => {
     expect(formatIssues([{ path: 'theme.accent', message: 'low contrast' }], 'warning')).toContain(
-      '⚠ chai.config.ts warnings:',
+      '⚠ chai.config.yaml warnings:',
     );
   });
 
   it('handles an empty issue list', () => {
-    expect(formatIssues([], 'error')).toBe('✖ chai.config.ts invalid:\n');
+    expect(formatIssues([], 'error')).toBe('✖ chai.config.yaml invalid:\n');
   });
 
   it('indents continuation lines to the arrow column', () => {
@@ -688,7 +704,7 @@ describe('parseConfig', () => {
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       expect(error.name).toBe('ChaiConfigError');
-      expect(error.message).toContain('✖ chai.config.ts invalid:');
+      expect(error.message).toContain('✖ chai.config.yaml invalid:');
     }
   });
 
@@ -760,10 +776,10 @@ describe('parseConfig', () => {
   });
 
   it('tells the truth about analytics when it cannot see the environment', () => {
-    // Build-time callers load chai.config.ts through plain Node, where
-    // `import.meta.env` is undefined — so the key is invisible no matter what the
-    // real environment holds. Claiming "no network calls will be made" from there
-    // would be a false privacy statement.
+    // A shape-only check (`scripts/check-config.mts`) validates the YAML without
+    // injecting the key, so it cannot know whether the real build environment holds
+    // one. Claiming "no network calls will be made" from there would be a false
+    // privacy statement — hence the deliberately non-committal warning.
     const { warnings } = parseConfig(
       { ...base, analytics: { provider: 'posthog', apiKey: undefined } },
       { envSubstituted: false },
@@ -783,11 +799,42 @@ describe('parseConfig', () => {
   });
 });
 
-// ── defineConfig ─────────────────────────────────────────────────────────────
+// ── branding (ADR-032) ───────────────────────────────────────────────────────
 
-describe('defineConfig', () => {
-  it('is an identity function and never validates', () => {
-    const raw = { creator: { name: 'X', vpa: 'not-a-vpa' }, chai: { basePrice: -1 } };
-    expect(defineConfig(raw as ChaiConfigInput)).toBe(raw);
+describe('branding', () => {
+  it('defaults every field to the maker’s own values when omitted', () => {
+    const { branding } = okOrThrow(base);
+    expect(branding).toEqual({
+      maker: {
+        name: 'Shivam Sharma',
+        supportUrl: 'https://buymeacoffee.com/shivams136',
+      },
+      project: {
+        name: 'buy-me-a-chai',
+        repoUrl: 'https://github.com/shivams136/buy-me-a-chai',
+        templateUrl: 'https://github.com/shivams136/buy-me-a-chai/generate',
+      },
+    });
+  });
+
+  it('lets a fork override a single field while inheriting the rest', () => {
+    const { branding } = okOrThrow({
+      ...base,
+      branding: { maker: { name: 'Asha', supportUrl: 'https://ko-fi.com/asha' } },
+    });
+    expect(branding.maker.name).toBe('Asha');
+    expect(branding.maker.supportUrl).toBe('https://ko-fi.com/asha');
+    // project.* still inherits the maker's defaults.
+    expect(branding.project.name).toBe('buy-me-a-chai');
+  });
+
+  it('rejects a non-URL support link', () => {
+    expect(pathsFor({ ...base, branding: { maker: { supportUrl: 'not a url' } } })).toContain(
+      'branding.maker.supportUrl',
+    );
+  });
+
+  it('rejects an unknown branding key', () => {
+    expect(pathsFor({ ...base, branding: { makr: {} } })).toContain('branding.makr');
   });
 });

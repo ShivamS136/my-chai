@@ -9,8 +9,8 @@
  *
  * ## The two gates
  *
- * `__CHAI_ANALYTICS__` is a build-time boolean injected by the `chai-analytics-flag`
- * plugin (vite.config.ts): true only when `chai.config.ts` declares an `analytics`
+ * `__CHAI_ANALYTICS__` is a build-time boolean injected by the `chai-config`
+ * plugin (vite.config.ts): true only when `chai.config.yaml` declares an `analytics`
  * block. It is a literal by the time Rollup sees it, so on a default config the
  * `import('./posthog.ts')` below sits in an `if (false)` branch and the entire
  * PostHog chunk is tree-shaken out of `dist` (ADR-028).

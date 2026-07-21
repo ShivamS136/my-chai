@@ -11,11 +11,10 @@
  * they stay pure and unit-testable.
  *
  * No network call happens here — `withReferral` only builds an href, so hard rule 4
- * (nothing over the wire when analytics is off) holds. Capturing these signals in
- * PostHog is Session 5 (analytics); this file only builds and reads URLs.
+ * (nothing over the wire when analytics is off) holds. `readInboundSource` is also
+ * what `main.tsx` attaches to the `page_view` event as `source`, so the same signal
+ * the on-page chip shows is the one PostHog counts (ADR-027).
  */
-
-import { MAKER_PROJECT } from '../project.ts';
 
 const currentHost = (): string => (typeof window !== 'undefined' ? window.location.hostname : '');
 
@@ -26,12 +25,15 @@ const currentHost = (): string => (typeof window !== 'undefined' ? window.locati
  *  - `utm_medium`   = `referral`; `utm_content` = where it was clicked;
  *  - `ref`          = host, the domain-referral convention some hosts read.
  *
- * The host is public information, never PII. Returns the URL untouched when there is
- * no host (build/SSR) or the URL cannot be parsed.
+ * `campaign` is the source project's name — injected (from `config.branding.project`)
+ * rather than imported, so this stays pure and unit-testable (ADR-027, ADR-032). The
+ * host is public information, never PII. Returns the URL untouched when there is no
+ * host (build/SSR) or the URL cannot be parsed.
  */
 export const withReferral = (
   url: string,
   surface: string,
+  campaign: string,
   host: string = currentHost(),
 ): string => {
   if (host === '') return url;
@@ -39,7 +41,7 @@ export const withReferral = (
     const u = new URL(url);
     u.searchParams.set('utm_source', host);
     u.searchParams.set('utm_medium', 'referral');
-    u.searchParams.set('utm_campaign', MAKER_PROJECT.name);
+    u.searchParams.set('utm_campaign', campaign);
     u.searchParams.set('utm_content', surface);
     u.searchParams.set('ref', host);
     return u.toString();
@@ -61,7 +63,7 @@ const isDisplayChar = (ch: string): boolean => {
  * Reads where a visit was referred from (`?ref=` / `?source=` / `?utm_source=`),
  * sanitised for display: control and angle characters dropped, capped at 48 chars,
  * returned as plain text (never a URL) so it is safe to render as-is. `null` when
- * absent or empty. PostHog capture of the same signal is Session 5 (ADR-027).
+ * absent or empty.
  */
 export const readInboundSource = (
   search: string = typeof window !== 'undefined' ? window.location.search : '',

@@ -1,8 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { MAKER_PROJECT } from '../project.ts';
+import { config } from '../config/config.ts';
 import { strings } from '../strings.ts';
 import { Masthead } from './Masthead.tsx';
+
+const { project } = config.branding;
 
 describe('Masthead', () => {
   it('renders the locked brand wordmark inside the page banner', () => {
@@ -23,7 +25,7 @@ describe('Masthead', () => {
     });
     expect(ctas.length).toBeGreaterThan(0);
     for (const cta of ctas) {
-      expect(cta.getAttribute('href')).toContain(MAKER_PROJECT.templateUrl);
+      expect(cta.getAttribute('href')).toContain(project.templateUrl);
       expect(cta).toHaveAttribute('rel', 'noopener noreferrer');
     }
     // The labelled variant carries the visible text.

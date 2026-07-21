@@ -18,13 +18,14 @@
 
 import process from 'node:process';
 import { findPlaceholders } from './placeholder-detect.mjs';
+import { readChaiConfigRaw } from './read-config.mts';
 
-const { default: config } = await import('../chai.config.ts');
+const config = readChaiConfigRaw();
 
 const findings = findPlaceholders(config);
 
 if (findings.length === 0) {
-  console.log('✓ chai.config.ts: no placeholder values — safe to deploy.');
+  console.log('✓ chai.config.yaml: no placeholder values — safe to deploy.');
   process.exit(0);
 }
 
@@ -33,14 +34,14 @@ const lines = findings.map((f) => `  ${f.path.padEnd(14)} → ${f.message}`).joi
 
 if (allowed) {
   console.warn(
-    `⚠ chai.config.ts still has placeholder values (CHAI_ALLOW_PLACEHOLDER=1):\n${lines}`,
+    `⚠ chai.config.yaml still has placeholder values (CHAI_ALLOW_PLACEHOLDER=1):\n${lines}`,
   );
   process.exit(0);
 }
 
 console.error(
-  `✖ Refusing to deploy: chai.config.ts still has the example values.\n${lines}\n\n` +
-    '  Edit chai.config.ts, commit, and push again. See docs/SETUP.md step 2.\n' +
+  `✖ Refusing to deploy: chai.config.yaml still has the example values.\n${lines}\n\n` +
+    '  Edit chai.config.yaml, commit, and push again. See docs/SETUP.md step 2.\n' +
     '  To preview a deploy anyway: CHAI_ALLOW_PLACEHOLDER=1 pnpm build:deploy\n',
 );
 process.exit(1);

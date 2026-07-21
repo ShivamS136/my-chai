@@ -1,5 +1,5 @@
 /**
- * Validates chai.config.ts against the Zod schema and exits non-zero on failure.
+ * Validates chai.config.yaml against the Zod schema and exits non-zero on failure.
  *
  * `pnpm build` already fails on an invalid config via the `chai-config-validator`
  * plugin in vite.config.ts (a bundler never executes app code, so an import alone
@@ -12,18 +12,19 @@
  */
 
 import process from 'node:process';
-import rawConfig from '../chai.config.ts';
 import { ChaiConfigError, formatIssues, parseConfig } from '../src/config/load.ts';
+import { readChaiConfigRaw } from './read-config.mts';
 
 // `load.ts` is deliberately side-effect-free, so this try/catch can actually reach
 // the error. Importing the app's config singleton instead would throw during import.
 try {
-  // Plain Node: `import.meta.env` is undefined here, so the analytics key is invisible.
-  const { warnings } = parseConfig(rawConfig, { envSubstituted: false });
+  // envSubstituted: false — this validates the YAML's shape, not the analytics wiring;
+  // the build-time key injection is the plugin's concern (see vite.config.ts).
+  const { warnings } = parseConfig(readChaiConfigRaw(), { envSubstituted: false });
   if (warnings.length > 0) {
     console.error(formatIssues(warnings, 'warning'));
   }
-  console.log('✓ chai.config.ts is valid.');
+  console.log('✓ chai.config.yaml is valid.');
 } catch (error) {
   if (error instanceof ChaiConfigError) {
     console.error(error.message);

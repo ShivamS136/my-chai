@@ -145,8 +145,8 @@ export const strings = {
   /**
    * The project's template links, shown in the masthead and footer (ADR-026,
    * ADR-027). Both are deletable from source by any fork — the code is public. The
-   * URLs and names live in `src/project.ts` (the one place a fork edits); these are
-   * the labels, keyed off those constants so the maker's name flows through.
+   * URLs and names live in the `branding` block of `chai.config.yaml` (ADR-032);
+   * these are the labels, taking the maker/project name so it flows through.
    */
   poweredBy: (projectName: string): string => `Powered by ${projectName}`,
   poweredByTagline: 'self-hosted · 0% commission',
@@ -156,7 +156,7 @@ export const strings = {
    * attribution, so it is referral-tagged like the rest (ADR-027).
    */
   createYourPage: 'Create your support page',
-  /** Support-link label — the maker's name is the primary variable (`src/project.ts`). */
+  /** Support-link label — the maker's name comes from `branding.maker` in the config. */
   supportMaker: (makerName: string): string => `Support ${makerName}`,
   /** Inbound referral chip, shown when the page is opened with `?ref=` / `?source=`. */
   referredVia: (source: string): string => `Referred via ${source}`,

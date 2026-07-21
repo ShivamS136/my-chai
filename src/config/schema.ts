@@ -1,8 +1,10 @@
 /**
- * The `chai.config.ts` schema — the public API of this project (ADR-003).
+ * The `chai.config.yaml` schema — the public API of this project (ADR-003, ADR-030).
  *
- * Framework-free by contract (ADR-004): no React, no DOM, no `node:*`. It runs in
- * the browser bundle and inside a plain Node build check.
+ * Framework-free by contract (ADR-004): no React, no DOM, no `node:*`. Field
+ * `.describe()`s feed `chai.schema.json` (via `pnpm gen:schema`), the creator's
+ * editor autocomplete. The values are validated here at build time; the browser
+ * receives the result as a plain object, so this schema never ships in the bundle.
  *
  * Every object level is `z.strictObject`, so a typo like `cretor` fails the build
  * instead of silently producing a page the creator cannot debug.
@@ -270,34 +272,49 @@ const vpaSchema = z.string().superRefine((v, ctx) => {
 });
 
 const socialSchema = z.strictObject({
-  label: line(24).superRefine((v, ctx) => {
-    if (v.length === 0) issue(ctx, 'Required (e.g. "GitHub").');
-  }),
-  url: httpUrl(),
+  label: line(24)
+    .describe('The platform name, e.g. "GitHub" — also the icon and the link’s accessible name.')
+    .superRefine((v, ctx) => {
+      if (v.length === 0) issue(ctx, 'Required (e.g. "GitHub").');
+    }),
+  url: httpUrl().describe('The full https:// URL to your profile on that platform.'),
 });
 
 const creatorSchema = z.strictObject({
-  name: creatorNameSchema,
-  vpa: vpaSchema,
-  tagline: line(80).optional(),
-  avatar: assetPath().optional(),
-  bio: block(500).optional(),
+  name: creatorNameSchema.describe(
+    'Your display name — the page heading and the browser title. 1–50 characters.',
+  ),
+  vpa: vpaSchema.describe(
+    'Your UPI ID, like name@okaxis. Copy it from your UPI app — this is where money goes. Never edit it by hand.',
+  ),
+  tagline: line(80).describe('A one-line tagline shown under your name.').optional(),
+  avatar: assetPath()
+    .describe('Path to a square avatar in public/, e.g. /avatar.png. Omit for an initials disc.')
+    .optional(),
+  bio: block(500)
+    .describe(
+      'A short bio. Supports **bold**, _italics_ and [links](https://…). Up to 500 characters.',
+    )
+    .optional(),
   // Defaults to [] rather than undefined so Profile.tsx needs no branch.
   socials: z
     .array(socialSchema)
     .max(6, { error: 'More than 6 entries — pick your best 6.' })
+    .describe('Up to 6 social links, shown as icons under your name.')
     .default([]),
 });
 
 // ── works ────────────────────────────────────────────────────────────────────
 
 const workSchema = z.strictObject({
-  title: line(60).superRefine((v, ctx) => {
-    if (v.length === 0) issue(ctx, 'Required.');
-  }),
-  description: line(120).optional(),
-  url: httpUrl(),
-  image: assetPath().optional(),
+  title: line(60)
+    .describe('The project’s name.')
+    .superRefine((v, ctx) => {
+      if (v.length === 0) issue(ctx, 'Required.');
+    }),
+  description: line(120).describe('A one-line description of the project.').optional(),
+  url: httpUrl().describe('Where the project lives — repo, site, or write-up.'),
+  image: assetPath().describe('Optional thumbnail in public/, e.g. /works/thing.png.').optional(),
 });
 
 // ── chai ─────────────────────────────────────────────────────────────────────
@@ -367,13 +384,25 @@ const defaultNoteSchema = z
   .default('');
 
 const chaiSchema = z.strictObject({
-  basePrice: rupeeInt(1, 10_000),
-  presets: presetsSchema,
-  allowCustomAmount: z.boolean().default(true),
+  basePrice: rupeeInt(1, 10_000).describe('Price of one chai, in whole rupees (e.g. 50).'),
+  presets: presetsSchema.describe(
+    'How many chai the one-tap chips offer, 1–4 amounts, e.g. [1, 3, 5]. Sorted automatically.',
+  ),
+  allowCustomAmount: z
+    .boolean()
+    .describe('Show the “enter your own amount” field. Default true.')
+    .default(true),
   // A soft UI warning threshold only. It never blocks a donor (P0.3: we warn).
-  maxAmountWarning: rupeeInt(1, 10_000_000).default(100_000),
-  defaultNote: defaultNoteSchema,
-  allowDonorMessage: z.boolean().default(true),
+  maxAmountWarning: rupeeInt(1, 10_000_000)
+    .describe('Amounts above this show a “double-check” caution — a nudge, never a block.')
+    .default(100_000),
+  defaultNote: defaultNoteSchema.describe(
+    'The payment note used when a donor leaves the message field empty. ≤ 60 characters; plain words are safest.',
+  ),
+  allowDonorMessage: z
+    .boolean()
+    .describe('Let donors attach a one-line message to the payment. Default true.')
+    .default(true),
 });
 
 // ── theme ────────────────────────────────────────────────────────────────────
@@ -387,13 +416,19 @@ const accentSchema = z
       issue(ctx, parsed.reason);
     }
   })
+  .describe(
+    'Your accent colour (hex / rgb() / oklch()). The one palette knob — recolours the CTA, borders and links, never the off-white canvas.',
+  )
   .default('#C4622D');
 
 // `.prefault({})`, not `.default({})`: in Zod v4, `.default({})` short-circuits and
 // returns the literal `{}` without applying the inner field defaults.
 const themeSchema = z
   .strictObject({
-    mode: z.enum(['light', 'dark', 'auto']).default('auto'),
+    mode: z
+      .enum(['light', 'dark', 'auto'])
+      .describe('light / dark pin the palette; auto follows the visitor’s OS. Default auto.')
+      .default('auto'),
     accent: accentSchema,
   })
   .prefault({});
@@ -404,11 +439,18 @@ const themeSchema = z
 // is literally `undefined` so the noop adapter is chosen and zero bytes ship.
 const analyticsSchema = z
   .strictObject({
-    provider: z.enum(['posthog'], {
-      error: 'Must be "posthog" (the only adapter in v0).',
-    }),
+    provider: z
+      .enum(['posthog'], {
+        error: 'Must be "posthog" (the only adapter in v0).',
+      })
+      .describe('The analytics provider. Only "posthog" in v0.'),
     // May legitimately be undefined: it comes from an unset VITE_POSTHOG_KEY.
-    apiKey: z.string().optional(),
+    apiKey: z
+      .string()
+      .describe(
+        'Leave this out — the key is injected at build from the VITE_POSTHOG_KEY environment variable, never written here.',
+      )
+      .optional(),
     host: httpUrl()
       .superRefine((v, ctx) => {
         if (v.startsWith('http://')) {
@@ -416,8 +458,12 @@ const analyticsSchema = z
         }
       })
       .transform((v) => v.replace(/\/+$/, ''))
+      .describe(
+        'Your PostHog ingestion host. Default is US cloud; use the EU host if you signed up there.',
+      )
       .default('https://us.i.posthog.com'),
   })
+  .describe('Optional analytics. Omit this whole block to ship zero tracking code (the default).')
   .optional();
 
 // ── meta ─────────────────────────────────────────────────────────────────────
@@ -427,14 +473,19 @@ const BCP47_RE = /^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$/;
 const metaSchema = z
   .strictObject({
     title: line(70)
+      .describe('Browser tab and social-card title. Defaults to “Buy {your name} a chai”.')
       .superRefine((v, ctx) => {
         if (v.length === 0) {
           issue(ctx, 'Empty — remove the line to use the default "Buy {name} a chai".');
         }
       })
       .optional(),
-    description: line(160).optional(),
-    ogImage: assetPath().optional(),
+    description: line(160)
+      .describe('Meta description for search results and social cards.')
+      .optional(),
+    ogImage: assetPath()
+      .describe('Social-share image. Use an absolute https:// URL for reliable crawler previews.')
+      .optional(),
     language: z
       .string()
       .transform((v) => v.trim())
@@ -443,7 +494,59 @@ const metaSchema = z
           issue(ctx, `Must be a BCP-47 tag like "en", "hi", or "en-IN" — got "${v}".`);
         }
       })
+      .describe('The page’s BCP-47 language tag (sets <html lang>). Default "en".')
       .default('en'),
+  })
+  .prefault({});
+
+// ── branding ─────────────────────────────────────────────────────────────────
+
+/**
+ * Origin branding (ADR-032) — who made this template, shown in the masthead and
+ * footer. Every field DEFAULTS to the maker's own value, so a creator who never
+ * touches `branding` inherits it, and a maker who changes their support URL sees it
+ * propagate to every fork on the next template update. Overriding a field rebrands
+ * that one link.
+ *
+ * The links themselves live in `Masthead.tsx` / `Footer.tsx`; deleting them is still
+ * a source edit, deliberately (ADR-026). This block supersedes the old
+ * `src/project.ts` constants — the values moved here so a rebrand needs no code edit.
+ */
+const makerSchema = z
+  .strictObject({
+    name: line(50)
+      .describe('The template author’s display name, shown in the footer “Support …” link.')
+      .default('Shivam Sharma'),
+    supportUrl: httpUrl()
+      .describe('The author’s own support page — Buy Me a Coffee, Ko-fi, GitHub Sponsors, …')
+      .default('https://buymeacoffee.com/shivams136'),
+  })
+  .prefault({});
+
+const makerProjectSchema = z
+  .strictObject({
+    name: line(50)
+      .describe('The template repo / package name — the “Powered by …” credit in the footer.')
+      .default('buy-me-a-chai'),
+    repoUrl: httpUrl()
+      .describe('The canonical template repository, linked from the footer credit.')
+      .default('https://github.com/shivams136/buy-me-a-chai'),
+    templateUrl: httpUrl()
+      .describe(
+        'GitHub’s “Use this template” URL — where the masthead CTA sends a visitor who wants their own page.',
+      )
+      .default('https://github.com/shivams136/buy-me-a-chai/generate'),
+  })
+  .prefault({});
+
+// `.prefault({})`, not `.default({})`: in Zod v4 `.default({})` returns the literal
+// `{}` without applying the inner field defaults (same reason as `themeSchema`).
+const brandingSchema = z
+  .strictObject({
+    maker: makerSchema.describe('The template author — their name and support page.'),
+    project: makerProjectSchema.describe(
+      'The template repository — its name, repo URL and template URL.',
+    ),
   })
   .prefault({});
 
@@ -456,22 +559,26 @@ const metaSchema = z
  */
 export const chaiConfigSchema = z
   .strictObject({
-    creator: creatorSchema,
+    creator: creatorSchema.describe('Who you are — name, UPI ID, bio, social links.'),
     works: z
       .array(workSchema)
       .max(12, { error: 'More than 12 entries — keep your 12 best.' })
+      .describe('Your projects, up to 12. Omit or leave empty to hide the section.')
       .default([]),
-    chai: chaiSchema,
-    theme: themeSchema,
+    chai: chaiSchema.describe('Pricing and the donor’s amount + message controls.'),
+    theme: themeSchema.describe('Palette mode and your accent colour.'),
     analytics: analyticsSchema,
-    meta: metaSchema,
+    meta: metaSchema.describe('Page title, description, social card, and language.'),
+    branding: brandingSchema.describe(
+      'The buy-me-a-chai template’s own links. Defaults to the template author’s; override to make them yours.',
+    ),
   })
   .transform((cfg) => ({
     ...cfg,
     meta: { ...cfg.meta, title: cfg.meta.title ?? `Buy ${cfg.creator.name} a chai` },
   }));
 
-// ── types & defineConfig ─────────────────────────────────────────────────────
+// ── types ────────────────────────────────────────────────────────────────────
 
 /** What creators write — defaults optional. */
 export type ChaiConfigInput = z.input<typeof chaiConfigSchema>;
@@ -482,16 +589,4 @@ export type ChaiWork = ChaiConfig['works'][number];
 export type ChaiSocial = ChaiCreator['socials'][number];
 export type ChaiTheme = ChaiConfig['theme'];
 export type ChaiAnalytics = NonNullable<ChaiConfig['analytics']>;
-
-/**
- * Identity function. Gives creators autocomplete and inline TS errors in
- * `chai.config.ts`, and deliberately never parses: parsing at module-eval time
- * would throw a raw ZodError stack before `load.ts` could format it into the
- * readable per-field block creators are meant to see.
- *
- * Two error surfaces by design — TS catches shape and typo mistakes in the editor,
- * Zod catches value mistakes at build. Neither can do the other's job.
- */
-export function defineConfig<const T extends ChaiConfigInput>(config: T): T {
-  return config;
-}
+export type ChaiBranding = ChaiConfig['branding'];

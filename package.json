@@ -21,10 +21,12 @@
     "test:coverage": "vitest run --coverage",
     "check:config": "node scripts/check-config.mts",
     "check:placeholder": "node scripts/check-placeholder.mjs",
+    "check:schema": "node scripts/gen-schema.mts --check",
+    "gen:schema": "node scripts/gen-schema.mts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm lint && pnpm typecheck && pnpm check:schema && pnpm test && pnpm build"
   },
   "dependencies": {
     "lucide-react": "1.25.0",
@@ -53,6 +55,7 @@
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.1.5",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "yaml": "2.9.0"
   }
 }

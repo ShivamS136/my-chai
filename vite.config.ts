@@ -1,39 +1,134 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { loadEnv } from 'vite';
 import { defineConfig, type Plugin } from 'vitest/config';
+import { readChaiConfigRaw, resetChaiConfigCache } from './scripts/read-config.mts';
+import {
+  ChaiConfigError,
+  declaresAnalytics,
+  formatIssues,
+  parseConfig,
+} from './src/config/load.ts';
 
 // `defineConfig` is imported from `vitest/config`, not `vite`: Vite's own
 // `UserConfigExport` has no `test` key and rejects the block at typecheck.
 
+// ── shared config plumbing ───────────────────────────────────────────────────
+//
+// Every plugin below reads `chai.config.yaml` through `readChaiConfigRaw()` — one
+// memoised parse per build (ADR-030), not one per plugin. `src/config/load.ts` then
+// turns that plain object into a validated `ChaiConfig`; it stays framework-free,
+// while the `node:fs`/YAML read lives in `scripts/read-config.mts`.
+
+const VIRTUAL_ID = 'virtual:chai-config';
+// The `\0` (NUL) prefix is Rollup's "this is not a real file" marker: it makes Vite's
+// fs resolver, node_modules resolution and the public/ copier all skip the id, so
+// nothing tries to read a file called "virtual:chai-config" off disk.
+const RESOLVED_VIRTUAL_ID = `\0${VIRTUAL_ID}`;
+
+const CHAI_YAML_PATH = new URL('./chai.config.yaml', import.meta.url).pathname;
+
 /**
- * Fails the build when chai.config.ts is invalid (P0.1).
+ * The analytics key, read from the environment at build time and injected into the
+ * config here rather than written into `chai.config.yaml` by the creator. That is
+ * what removes the `import.meta.env?.VITE_POSTHOG_KEY` line — and its `?.` typecheck
+ * footgun — from the creator's file (ADR-030). Set once in `config()`, before any
+ * `buildStart`/`load` runs, so both can read it.
+ */
+let injectedApiKey = '';
+
+/** Returns the raw config with the build-time analytics key folded in, if declared. */
+const withInjectedKey = (raw: unknown): unknown => {
+  if (raw === null || typeof raw !== 'object') return raw;
+  const analytics = (raw as { analytics?: unknown }).analytics;
+  if (analytics === null || typeof analytics !== 'object') return raw;
+  return { ...raw, analytics: { ...(analytics as object), apiKey: injectedApiKey } };
+};
+
+/**
+ * The `chai-config` plugin: serves the validated config to the browser as a plain
+ * object (`virtual:chai-config`) and injects the build-time analytics flag.
  *
- * This has to be a plugin, not just an import in main.tsx: a bundler only *bundles*
- * modules, it never executes them, so a module-scope `throw` in the app code never
- * fires during `vite build`. Running the parse in `buildStart` is what makes a bad
- * VPA or a zero base price stop the build — on Vercel, on Pages, and locally.
+ * Serving a pre-validated object is what keeps Zod *and* the YAML parser out of the
+ * browser bundle (ADR-030): the browser imports `virtual:chai-config` and receives
+ * serialized data, never the schema or the parser.
  *
- * The config is imported dynamically so a parse failure surfaces as a Rollup build
- * error with our formatted message rather than a config-loading crash.
+ * `config()` also injects `__CHAI_ANALYTICS__` (ADR-028) — the build-time gate that
+ * lets Rollup drop the PostHog chunk from a disabled build. It reads `declaresAnalytics`
+ * off the *raw* YAML (before the key is folded in), so the bytes gate answers "did the
+ * creator declare analytics", independent of whether this build's environment holds a
+ * key. No `apply` gate: `resolveId`/`load` must run in dev and under Vitest too, or the
+ * virtual import would not resolve there.
+ */
+function chaiConfig(): Plugin {
+  return {
+    name: 'chai-config',
+    config(_userConfig, { mode }) {
+      const env = loadEnv(mode, process.cwd(), 'VITE_');
+      injectedApiKey = env.VITE_POSTHOG_KEY ?? process.env.VITE_POSTHOG_KEY ?? '';
+      let declared = false;
+      try {
+        declared = declaresAnalytics(readChaiConfigRaw());
+      } catch {
+        // An unparseable config is chai-config-validator's error to report. Failing
+        // closed here is the safe default: no flag, no analytics, no bytes.
+      }
+      return { define: { __CHAI_ANALYTICS__: JSON.stringify(declared) } };
+    },
+    resolveId(id) {
+      return id === VIRTUAL_ID ? RESOLVED_VIRTUAL_ID : undefined;
+    },
+    load(id) {
+      if (id !== RESOLVED_VIRTUAL_ID) return undefined;
+      // envSubstituted: true — the key was injected above, so `normalizeAnalytics`
+      // drops analytics when it is empty. A parse failure throws the formatted
+      // ChaiConfigError, which surfaces as Vite's dev overlay and (in build) via the
+      // chai-config-validator's prettier report. The serialized object carries no
+      // undefined values (JSON.stringify omits them), so `analytics: undefined`
+      // simply vanishes — absent means disabled, exactly as intended.
+      const { config } = parseConfig(withInjectedKey(readChaiConfigRaw()), {
+        envSubstituted: true,
+      });
+      return `export default ${JSON.stringify(config)};`;
+    },
+    handleHotUpdate(ctx) {
+      if (ctx.file !== CHAI_YAML_PATH) return undefined;
+      // The YAML is read through node:fs, so Vite never saw it as a dependency of the
+      // virtual module — wire the reload by hand. A full reload (not a partial HMR
+      // update) is right because the config also drives transformIndexHtml below
+      // (title/theme/VPA), which Vite re-runs on the next request.
+      resetChaiConfigCache();
+      const mod = ctx.server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_ID);
+      if (mod) ctx.server.moduleGraph.invalidateModule(mod);
+      ctx.server.ws.send({ type: 'full-reload' });
+      return [];
+    },
+  };
+}
+
+/**
+ * Fails the build when chai.config.yaml is invalid (P0.1), with a clean per-field
+ * report and any warnings.
+ *
+ * Kept separate from `chai-config` and `apply: 'build'` on purpose: if validation
+ * threw in serve mode, Vitest (which boots a Vite server) would abort the whole test
+ * suite and `pnpm dev` would hard-exit instead of rendering Vite's overlay. The dev
+ * overlay comes for free from `chai-config`'s `load` throwing when the app imports
+ * the virtual module. This plugin is what turns a bad VPA or a zero base price into a
+ * failed `vite build` on Vercel and Pages.
  */
 function chaiConfigValidator(): Plugin {
   return {
     name: 'chai-config-validator',
-    // Build only. Without this guard the plugin also runs in serve mode, which
-    // means (a) Vitest — which spins up a Vite server — aborts the entire test
-    // suite when the config is invalid, and (b) `pnpm dev` hard-exits instead of
-    // rendering Vite's error overlay. Dev-time validation is already covered by
-    // src/config/config.ts throwing at module load, which is what the overlay shows.
     apply: 'build',
-    async buildStart() {
-      const [{ default: raw }, { parseConfig, ChaiConfigError, formatIssues }] = await Promise.all([
-        import('./chai.config.ts'),
-        import('./src/config/load.ts'),
-      ]);
+    buildStart() {
       try {
-        // envSubstituted: false — this import goes through plain Node, so
-        // `import.meta.env` is undefined here and the analytics key is invisible.
-        const { warnings } = parseConfig(raw, { envSubstituted: false });
+        // envSubstituted: true — the key was injected in chai-config's config() hook,
+        // so the analytics warnings ("no network calls will be made" vs "cannot see
+        // the key") reflect the real build environment rather than a plain-Node guess.
+        const { warnings } = parseConfig(withInjectedKey(readChaiConfigRaw()), {
+          envSubstituted: true,
+        });
         for (const warning of warnings) {
           this.warn(`${warning.path} → ${warning.message}`);
         }
@@ -44,45 +139,6 @@ function chaiConfigValidator(): Plugin {
         }
         throw error;
       }
-    },
-  };
-}
-
-/**
- * Injects `__CHAI_ANALYTICS__` — the build-time gate that keeps a disabled build
- * free of PostHog bytes, not merely free of PostHog requests (P0.11, ADR-028).
- *
- * Hard rule 4 is "no network calls when analytics is disabled", and a runtime `if`
- * would satisfy it. This goes further because it can: `chai.config.ts` is known at
- * build time, so replacing the flag with a literal `false` puts the dynamic
- * `import('./posthog.ts')` in `src/analytics/index.ts` inside dead code, and Rollup
- * drops the chunk instead of emitting ~200 kB that a default fork downloads with
- * its repo and never runs. CI greps `dist/` to prove it.
- *
- * Note this reads the *raw* config (see `declaresAnalytics`): the parsed one always
- * reports analytics as disabled in a plain-Node context, because no
- * `import.meta.env` exists here to hold the key.
- *
- * A `config()` hook rather than a top-level `define`, so the async import of
- * `chai.config.ts` stays inside the plugin — and so Vitest, which resolves this
- * same config, gets the flag too.
- */
-function chaiAnalyticsFlag(): Plugin {
-  return {
-    name: 'chai-analytics-flag',
-    async config() {
-      let declared = false;
-      try {
-        const [{ default: raw }, { declaresAnalytics }] = await Promise.all([
-          import('./chai.config.ts'),
-          import('./src/config/load.ts'),
-        ]);
-        declared = declaresAnalytics(raw);
-      } catch {
-        // An unparseable config is chai-config-validator's error to report. Failing
-        // closed here is the safe default: no flag, no analytics, no bytes.
-      }
-      return { define: { __CHAI_ANALYTICS__: JSON.stringify(declared) } };
     },
   };
 }
@@ -117,15 +173,11 @@ function chaiNoscript(): Plugin {
     name: 'chai-noscript',
     transformIndexHtml: {
       order: 'pre',
-      async handler(html) {
+      handler(html) {
         try {
-          const [{ default: raw }, { parseConfig }] = await Promise.all([
-            import('./chai.config.ts'),
-            import('./src/config/load.ts'),
-          ]);
-          // envSubstituted: false — plain Node, so analytics stays invisible here;
-          // we only read creator fields, which do not depend on it.
-          const { config } = parseConfig(raw, { envSubstituted: false });
+          // envSubstituted: false — we read only creator/meta fields, which do not
+          // depend on the analytics key.
+          const { config } = parseConfig(readChaiConfigRaw(), { envSubstituted: false });
           const vpa = escapeHtml(config.creator.vpa);
           const title = escapeHtml(config.meta.title);
 
@@ -173,13 +225,9 @@ function chaiHead(): Plugin {
     name: 'chai-head',
     transformIndexHtml: {
       order: 'pre',
-      async handler(html) {
+      handler(html) {
         try {
-          const [{ default: raw }, { parseConfig }] = await Promise.all([
-            import('./chai.config.ts'),
-            import('./src/config/load.ts'),
-          ]);
-          const { config } = parseConfig(raw, { envSubstituted: false });
+          const { config } = parseConfig(readChaiConfigRaw(), { envSubstituted: false });
           const { creator, meta, theme } = config;
 
           const title = escapeHtml(meta.title);
@@ -236,8 +284,8 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    chaiConfig(),
     chaiConfigValidator(),
-    chaiAnalyticsFlag(),
     chaiNoscript(),
     chaiHead(),
   ],

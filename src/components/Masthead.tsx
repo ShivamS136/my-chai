@@ -1,9 +1,11 @@
 import { Coffee, Globe } from 'lucide-react';
 import type { JSX } from 'react';
+import { config } from '../config/config.ts';
 import { withReferral } from '../lib/referral.ts';
 import { resolveSocial } from '../lib/social.ts';
-import { MAKER_PROJECT } from '../project.ts';
 import { strings } from '../strings.ts';
+
+const { project } = config.branding;
 
 /**
  * The masthead (ADR-026): the project's locked brand bar, identical on every fork.
@@ -22,7 +24,7 @@ import { strings } from '../strings.ts';
 
 /** The repo's brand glyph (GitHub, GitLab, …), or a globe if the host is unmapped. */
 const repoGlyph = (): JSX.Element => {
-  const resolved = resolveSocial(MAKER_PROJECT.repoUrl);
+  const resolved = resolveSocial(project.repoUrl);
   if (resolved.kind === 'brand' && resolved.brand !== null) {
     return (
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="h-[18px] w-[18px]">
@@ -47,7 +49,7 @@ export function Masthead(): JSX.Element {
         </span>
 
         <a
-          href={withReferral(MAKER_PROJECT.templateUrl, 'masthead')}
+          href={withReferral(project.templateUrl, 'masthead', project.name)}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={strings.externalLink(strings.createYourPage)}
@@ -57,7 +59,7 @@ export function Masthead(): JSX.Element {
           {strings.createYourPage}
         </a>
         <a
-          href={withReferral(MAKER_PROJECT.templateUrl, 'masthead')}
+          href={withReferral(project.templateUrl, 'masthead', project.name)}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={strings.externalLink(strings.createYourPage)}

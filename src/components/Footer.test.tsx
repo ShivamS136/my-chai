@@ -1,18 +1,20 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { MAKER, MAKER_PROJECT } from '../project.ts';
+import { config } from '../config/config.ts';
 import { strings } from '../strings.ts';
 import { Footer } from './Footer.tsx';
+
+const { maker, project } = config.branding;
 
 describe('Footer', () => {
   it('credits the project repo and discloses where money goes', () => {
     render(<Footer />);
 
     const link = screen.getByRole('link', {
-      name: strings.externalLink(strings.poweredBy(MAKER_PROJECT.name)),
+      name: strings.externalLink(strings.poweredBy(project.name)),
     });
     // Referral params are appended, so the repo URL is the href's prefix.
-    expect(link.getAttribute('href')).toContain(MAKER_PROJECT.repoUrl);
+    expect(link.getAttribute('href')).toContain(project.repoUrl);
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText(strings.footerDisclosure)).toBeInTheDocument();
   });
@@ -21,9 +23,9 @@ describe('Footer', () => {
     render(<Footer />);
 
     const support = screen.getByRole('link', {
-      name: strings.externalLink(strings.supportMaker(MAKER.name)),
+      name: strings.externalLink(strings.supportMaker(maker.name)),
     });
-    expect(support.getAttribute('href')).toContain(MAKER.supportUrl);
+    expect(support.getAttribute('href')).toContain(maker.supportUrl);
     expect(support).toHaveAttribute('target', '_blank');
     expect(support).toHaveAttribute('rel', 'noopener noreferrer');
   });

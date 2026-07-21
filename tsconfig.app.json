@@ -24,5 +24,11 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "chai.config.ts", "vitest.setup.ts", "scripts/check-config.mts"]
+  "include": [
+    "src",
+    "vitest.setup.ts",
+    "scripts/check-config.mts",
+    "scripts/read-config.mts",
+    "scripts/gen-schema.mts"
+  ]
 }

@@ -2,9 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { track } from './analytics/index.ts';
-// Parses chai.config.ts at module load and throws the formatted error on an invalid
-// config, so `pnpm dev` surfaces it in Vite's overlay. Build-time enforcement is
-// separate — see the chai-config-validator plugin in vite.config.ts.
+// The validated config — a plain object the chai-config plugin built from
+// chai.config.yaml at build time (ADR-030). An invalid config fails earlier: at
+// build in chai-config-validator, in dev as Vite's overlay when the plugin's load
+// hook throws.
 import { config } from './config/config.ts';
 import './index.css';
 import { readInboundSource } from './lib/referral.ts';

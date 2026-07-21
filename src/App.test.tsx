@@ -3,8 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import App from './App.tsx';
 import { track } from './analytics/index.ts';
-import { MAKER, MAKER_PROJECT } from './project.ts';
+import { config } from './config/config.ts';
 import { strings } from './strings.ts';
+
+const { maker, project } = config.branding;
 
 /**
  * Page-assembly smoke test (P0.2, P0.10): the example config drives a page with the
@@ -33,11 +35,11 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: strings.paymentCardTitle })).toBeInTheDocument();
     expect(
       screen.getByRole('link', {
-        name: strings.externalLink(strings.poweredBy(MAKER_PROJECT.name)),
+        name: strings.externalLink(strings.poweredBy(project.name)),
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: strings.externalLink(strings.supportMaker(MAKER.name)) }),
+      screen.getByRole('link', { name: strings.externalLink(strings.supportMaker(maker.name)) }),
     ).toBeInTheDocument();
   });
 
