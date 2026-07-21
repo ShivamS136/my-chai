@@ -69,8 +69,9 @@ The template gets improvements — new payment-app fixes, features, dependency b
 2. It merges the latest template, **keeps your `chai.config.yaml` and `public/` exactly as they are**, checks the result still builds, and opens a **pull request**.
 3. Review the diff, and **Merge** — your page redeploys automatically.
 
-Two things to know:
+A few things to know:
 - It only ever changes template code, never your config or your assets — your UPI ID is safe.
+- It always uses one branch, `template-update`. Running it again rewrites that branch and updates the same pull request rather than opening a second one, so update branches never pile up. To have the branch removed once you merge, tick **Settings → General → Pull Requests → Automatically delete head branches**.
 - If the template changed its own GitHub Actions files, the PR **can't** include those (GitHub blocks automated edits to workflows); the PR lists them so you can copy them across by hand if you want.
 - If you've edited component source yourself (say, to remove the footer links), those files get the template's version back. That path is for creators who only edit config; if you're editing code, you'll want to resolve those merges yourself.
 
