@@ -45,6 +45,19 @@ Each session ends green: `pnpm typecheck && pnpm test && pnpm build`. Restate co
 - Finalize SETUP.md walkthrough incl. ₹1 self-test checklist; README badges; cut `v0.1.0`.
 - Covers P0.8, P0.9, P0.11.
 
+### Session 6 — The creator's file, and how they update it
+Scheduled *before* `v0.1.0` on purpose: ADR-030 breaks the public config API, and that
+is free today and expensive the moment anyone has deployed.
+- `chai.config.yaml` + generated `chai.schema.json` (`z.toJSONSchema`); `chai-config` Vite
+  plugin validates at build time and serves `virtual:chai-config` — Zod and the YAML parser
+  leave the browser bundle.
+- `.describe()` on every schema field, since the JSON Schema is now the creator's only
+  autocomplete; CI asserts the committed schema still matches Zod.
+- Branding values become config with maker defaults; `src/project.ts` is removed (ADR-032).
+- `update-template.yml`: a **Run workflow** button that opens an update PR (ADR-031).
+- Rewrite CONFIG.md; SETUP.md gains an "updating" section.
+- Covers no new PRD IDs — it is a maintainability and creator-lifecycle session.
+
 ### Post-v0 manual gate (human, not Claude)
 Real-device matrix into `docs/COMPAT.md`: {GPay, PhonePe, Paytm, BHIM} × {Android Chrome, iOS Safari} × {QR, upload-QR, deeplink, copy}. v0 announcement only after QR path is confirmed on GPay + PhonePe.
 
