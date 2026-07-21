@@ -20,9 +20,20 @@ export interface QrCodeProps {
   readonly filename: string;
   /** Encodes the PNG on demand — see `UpiQr.toPngDataUrl`. */
   readonly toPngDataUrl: () => string;
+  /**
+   * Fired after the download starts. A callback rather than an import so this
+   * component stays presentational and analytics-free — the caller owns the event.
+   */
+  readonly onDownload?: () => void;
 }
 
-export function QrCode({ svgDataUrl, alt, filename, toPngDataUrl }: QrCodeProps): JSX.Element {
+export function QrCode({
+  svgDataUrl,
+  alt,
+  filename,
+  toPngDataUrl,
+  onDownload,
+}: QrCodeProps): JSX.Element {
   return (
     <figure className="flex flex-col items-center gap-4">
       {/*
@@ -46,7 +57,10 @@ export function QrCode({ svgDataUrl, alt, filename, toPngDataUrl }: QrCodeProps)
 
       <button
         type="button"
-        onClick={() => downloadDataUrl(toPngDataUrl(), filename)}
+        onClick={() => {
+          downloadDataUrl(toPngDataUrl(), filename);
+          onDownload?.();
+        }}
         className="inline-flex min-h-11 items-center gap-2 rounded-full border border-chai-line px-5 text-[13px] font-semibold text-chai-ink transition-colors hover:border-chai-accent hover:text-chai-accent"
       >
         <Download aria-hidden="true" className="h-4 w-4" />

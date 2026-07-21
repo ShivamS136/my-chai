@@ -1,10 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type ChaiConfig, type ChaiConfigInput, chaiConfigSchema } from '../config/schema.ts';
 import { MAX_NOTE_LENGTH } from '../lib/upi.ts';
 import { strings } from '../strings.ts';
 import { PaymentCard } from './PaymentCard.tsx';
+
+// Analytics is a seam, not a behaviour: mocking the whole module keeps the card
+// inert in every case below and gives the reporting cases something to assert on.
+vi.mock('../analytics/index.ts', () => ({ track: vi.fn() }));
+const { track } = await import('../analytics/index.ts');
 
 /**
  * Fixtures go through the real schema rather than hand-built objects, so these
@@ -32,6 +37,10 @@ const qrAltAmount = (): string => {
 
 const chip = (chaiCount: number): HTMLElement =>
   screen.getByRole('radio', { name: new RegExp(`^${chaiCount} chai,`) });
+
+afterEach(() => {
+  vi.mocked(track).mockClear();
+});
 
 describe('PaymentCard — amount selection (P0.3)', () => {
   it('selects one chai by default and shows its QR', () => {
@@ -199,6 +208,68 @@ describe('PaymentCard — donor message (P0.4)', () => {
   it('hides the message field when the creator disables it', () => {
     setup({ chai: { basePrice: 50, allowDonorMessage: false } });
     expect(screen.queryByLabelText(strings.messageLabel)).not.toBeInTheDocument();
+  });
+});
+
+describe('PaymentCard — analytics (P0.11)', () => {
+  it('reports a preset chip immediately, as one deliberate act', async () => {
+    const user = setup();
+    await user.click(chip(3));
+
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: 'amount_selected',
+      amount: 150,
+      preset: true,
+    });
+  });
+
+  it('reports a custom amount only once the donor stops typing', () => {
+    vi.useFakeTimers();
+    try {
+      render(<PaymentCard config={configFor()} />);
+      const custom = screen.getByLabelText(strings.customAmountLabel);
+
+      // Three keystrokes are one decision, not three: "1", "15", "150".
+      fireEvent.change(custom, { target: { value: '1' } });
+      act(() => vi.advanceTimersByTime(400));
+      fireEvent.change(custom, { target: { value: '15' } });
+      act(() => vi.advanceTimersByTime(400));
+      fireEvent.change(custom, { target: { value: '150' } });
+      expect(track).not.toHaveBeenCalled();
+
+      act(() => vi.advanceTimersByTime(800));
+      expect(track).toHaveBeenCalledExactlyOnceWith({
+        name: 'amount_selected',
+        amount: 150,
+        preset: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports nothing for a custom field cleared back to empty', () => {
+    vi.useFakeTimers();
+    try {
+      render(<PaymentCard config={configFor()} />);
+      const custom = screen.getByLabelText(strings.customAmountLabel);
+
+      fireEvent.change(custom, { target: { value: '9' } });
+      fireEvent.change(custom, { target: { value: '' } });
+      act(() => vi.advanceTimersByTime(2000));
+
+      expect(track).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never puts the donor message into an event (hard rule 5)', async () => {
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.messageLabel), 'from Ananya');
+    await user.click(chip(5));
+
+    expect(JSON.stringify(vi.mocked(track).mock.calls)).not.toContain('Ananya');
   });
 });
 

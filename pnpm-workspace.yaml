@@ -1,0 +1,9 @@
+# pnpm 11 settings. NOT a workspace declaration — there is no `packages:` key, and
+# v0 stays a single package on purpose (ADR-009). The v1 widget is what turns this
+# into a real workspace.
+#
+# `allowBuilds` is pnpm 11's home for postinstall approvals. core-js arrives as a
+# transitive dependency of posthog-js and its postinstall only prints a funding
+# banner; denying it keeps `pnpm install` non-interactive in CI and on a fresh fork.
+allowBuilds:
+  core-js: false

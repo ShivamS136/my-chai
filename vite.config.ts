@@ -48,6 +48,45 @@ function chaiConfigValidator(): Plugin {
   };
 }
 
+/**
+ * Injects `__CHAI_ANALYTICS__` — the build-time gate that keeps a disabled build
+ * free of PostHog bytes, not merely free of PostHog requests (P0.11, ADR-028).
+ *
+ * Hard rule 4 is "no network calls when analytics is disabled", and a runtime `if`
+ * would satisfy it. This goes further because it can: `chai.config.ts` is known at
+ * build time, so replacing the flag with a literal `false` puts the dynamic
+ * `import('./posthog.ts')` in `src/analytics/index.ts` inside dead code, and Rollup
+ * drops the chunk instead of emitting ~200 kB that a default fork downloads with
+ * its repo and never runs. CI greps `dist/` to prove it.
+ *
+ * Note this reads the *raw* config (see `declaresAnalytics`): the parsed one always
+ * reports analytics as disabled in a plain-Node context, because no
+ * `import.meta.env` exists here to hold the key.
+ *
+ * A `config()` hook rather than a top-level `define`, so the async import of
+ * `chai.config.ts` stays inside the plugin — and so Vitest, which resolves this
+ * same config, gets the flag too.
+ */
+function chaiAnalyticsFlag(): Plugin {
+  return {
+    name: 'chai-analytics-flag',
+    async config() {
+      let declared = false;
+      try {
+        const [{ default: raw }, { declaresAnalytics }] = await Promise.all([
+          import('./chai.config.ts'),
+          import('./src/config/load.ts'),
+        ]);
+        declared = declaresAnalytics(raw);
+      } catch {
+        // An unparseable config is chai-config-validator's error to report. Failing
+        // closed here is the safe default: no flag, no analytics, no bytes.
+      }
+      return { define: { __CHAI_ANALYTICS__: JSON.stringify(declared) } };
+    },
+  };
+}
+
 const HTML_ESCAPES: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -194,7 +233,14 @@ export default defineConfig({
   // GitHub Pages subpath (hard rule 7). The deploy workflow sets
   // BASE_PATH=/${repo-name}/ so renamed forks work untouched.
   base: process.env.BASE_PATH ?? '/',
-  plugins: [react(), tailwindcss(), chaiConfigValidator(), chaiNoscript(), chaiHead()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    chaiConfigValidator(),
+    chaiAnalyticsFlag(),
+    chaiNoscript(),
+    chaiHead(),
+  ],
   build: {
     outDir: 'dist',
     target: 'es2022',

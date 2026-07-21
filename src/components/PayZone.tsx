@@ -1,6 +1,7 @@
 import { ChevronDown, Copy, QrCode as QrCodeIcon, Smartphone } from 'lucide-react';
 import type { JSX } from 'react';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
+import { track } from '../analytics/index.ts';
 import { useDeeplinkAttempt } from '../hooks/useDeeplinkAttempt.ts';
 import { useIsMobile } from '../hooks/useIsMobile.ts';
 import { useToast } from '../hooks/useToast.ts';
@@ -39,16 +40,34 @@ export function PayZone({ intent, errors, qr }: PayZoneProps): JSX.Element {
   const { likelyFailed, markAttempt } = useDeeplinkAttempt(intent?.uri ?? null);
   const [qrOpen, setQrOpen] = useState(false);
   const qrPanelId = useId();
+  // `qr_view` is once per session (docs/ANALYTICS.md), and the page is a single
+  // route that never unmounts, so a ref *is* the session. Reopening the accordion
+  // to re-read the same QR is not a second view.
+  const qrViewReported = useRef(false);
 
   // Read from the URI's own `am`, so the number on screen is the number encoded.
   const payableRupees = intent === null ? null : Number.parseInt(intent.amount, 10);
 
   const handleCopy = useCallback((): void => {
     if (intent === null || payableRupees === null) return;
+    track({ name: 'pay_clicked', method: 'copy_vpa', amount: payableRupees });
     void copyText(intent.vpa).then((ok) => {
       showToast(ok ? strings.copyConfirmation(formatRupees(payableRupees)) : strings.copyFailed);
     });
   }, [intent, payableRupees, showToast]);
+
+  // Mobile only, by contract: the desktop QR is on screen from the first paint, so
+  // "the donor looked at it" is not an event there — it would just be `page_view`
+  // under another name and would make the two device funnels incomparable.
+  const toggleQr = (): void => {
+    setQrOpen((open) => {
+      if (!open && !qrViewReported.current && payableRupees !== null) {
+        qrViewReported.current = true;
+        track({ name: 'pay_clicked', method: 'qr_view', amount: payableRupees });
+      }
+      return !open;
+    });
+  };
 
   const qrNode = (): JSX.Element =>
     intent !== null && payableRupees !== null && qr !== null ? (
@@ -57,6 +76,9 @@ export function PayZone({ intent, errors, qr }: PayZoneProps): JSX.Element {
         alt={strings.qrAlt(intent.vpa, formatRupees(payableRupees))}
         filename={strings.qrDownloadFilename(intent.vpa, payableRupees)}
         toPngDataUrl={qr.toPngDataUrl}
+        onDownload={() =>
+          track({ name: 'pay_clicked', method: 'qr_download', amount: payableRupees })
+        }
       />
     ) : (
       <p className="py-6 text-center text-[13px] text-chai-muted">{strings.qrUnavailable}</p>
@@ -119,7 +141,10 @@ export function PayZone({ intent, errors, qr }: PayZoneProps): JSX.Element {
         <div className="flex flex-col gap-3">
           <a
             href={intent.uri}
-            onClick={markAttempt}
+            onClick={() => {
+              track({ name: 'pay_clicked', method: 'deeplink', amount: payableRupees });
+              markAttempt();
+            }}
             className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-chai-accent-strong px-6 text-[15px] font-semibold text-chai-accent-ink shadow-[0_2px_4px_rgb(43_29_20/0.14),0_12px_26px_-6px_rgb(163_78_34/0.45)] transition-transform hover:-translate-y-px active:translate-y-0 active:scale-[0.99]"
           >
             <Smartphone aria-hidden="true" className="h-5 w-5" />
@@ -147,7 +172,7 @@ export function PayZone({ intent, errors, qr }: PayZoneProps): JSX.Element {
               type="button"
               aria-expanded={qrOpen}
               aria-controls={qrPanelId}
-              onClick={() => setQrOpen((open) => !open)}
+              onClick={toggleQr}
               className="flex min-h-11 w-full items-center justify-between rounded-full px-4 text-[13px] font-semibold text-chai-muted transition-colors hover:text-chai-accent"
             >
               <span className="inline-flex items-center gap-2">

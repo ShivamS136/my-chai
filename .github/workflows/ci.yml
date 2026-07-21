@@ -48,6 +48,22 @@ jobs:
       - name: Build (Vercel / custom-domain layout)
         run: pnpm build
 
+      - name: Assert a disabled build ships no analytics bytes
+        # Hard rule 4 says a disabled build makes no network calls; ADR-028 goes
+        # further and says the code is not even there. The example config declares no
+        # `analytics` block, so `__CHAI_ANALYTICS__` folds to false and Rollup drops
+        # the whole PostHog chunk. That only holds while `import()` stays lexically
+        # inside the flag's branch in src/analytics/index.ts — a refactor that hoists
+        # it still passes every unit test and silently ships ~220 kB to every fork.
+        # This step is the only thing that notices.
+        run: |
+          if grep -rl 'disable_session_recording\|__PosthogExtensions__' dist/; then
+            echo "::error::dist/ contains PostHog bytes, but chai.config.ts declares no analytics block."
+            echo "See ADR-028 and the note above the ternary in src/analytics/index.ts."
+            exit 1
+          fi
+          echo "✓ no analytics bytes in a disabled build"
+
       - name: Build on a GitHub Pages subpath
         # Hard rule 7: every asset path must respect Vite `base`. Building the
         # subpath layout in CI is what stops an absolute path shipping.

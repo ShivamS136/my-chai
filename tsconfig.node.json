@@ -5,7 +5,11 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    // vite/client is here for `chai.config.ts`, not for vite.config.ts itself: the
+    // config is pulled into this project by the plugins that import it, and it reads
+    // `import.meta.env?.VITE_POSTHOG_KEY`. Without this, a creator who uncomments the
+    // analytics block — exactly as docs/SETUP.md tells them to — breaks `pnpm typecheck`.
+    "types": ["node", "vite/client"],
 
     "strict": true,
     "noUncheckedIndexedAccess": true,

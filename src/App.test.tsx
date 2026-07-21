@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import App from './App.tsx';
+import { track } from './analytics/index.ts';
 import { MAKER, MAKER_PROJECT } from './project.ts';
 import { strings } from './strings.ts';
 
@@ -37,5 +39,25 @@ describe('App', () => {
     expect(
       screen.getByRole('link', { name: strings.externalLink(strings.supportMaker(MAKER.name)) }),
     ).toBeInTheDocument();
+  });
+
+  it('makes no network call at all with analytics disabled (hard rule 4)', async () => {
+    // The example config declares no analytics block, which is what every fresh fork
+    // ships. `track` here is the real module, not a mock — this asserts the whole
+    // page, adapter included, is inert. The static counterpart (no `fetch(` anywhere
+    // in src) lives in src/analytics/contract.test.ts.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const beaconSpy = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('navigator', Object.assign(globalThis.navigator, { sendBeacon: beaconSpy }));
+
+    render(<App />);
+    track({ name: 'page_view' });
+    await userEvent.click(screen.getAllByRole('radio')[1] ?? screen.getByRole('main'));
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(beaconSpy).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+    fetchSpy.mockRestore();
   });
 });

@@ -7,11 +7,15 @@ import { strings, upiErrorStrings } from '../strings.ts';
 import { PayZone } from './PayZone.tsx';
 
 // The device branch and the clipboard are the two seams under test — mock both so
-// each layout is deterministic and no real Clipboard API is touched.
+// each layout is deterministic and no real Clipboard API is touched. Analytics is
+// mocked for the same reason: it is a seam, and the pay zone is where all four
+// `pay_clicked` methods originate.
 vi.mock('../hooks/useIsMobile.ts', () => ({ useIsMobile: vi.fn() }));
 vi.mock('../lib/clipboard.ts', () => ({ copyText: vi.fn() }));
+vi.mock('../analytics/index.ts', () => ({ track: vi.fn() }));
 const { useIsMobile } = await import('../hooks/useIsMobile.ts');
 const { copyText } = await import('../lib/clipboard.ts');
+const { track } = await import('../analytics/index.ts');
 
 const INTENT: UpiIntent = {
   uri: 'upi://pay?pa=shivam@okaxis&pn=Shivam&am=150.00&cu=INR',
@@ -148,5 +152,71 @@ describe('PayZone — mobile', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('PayZone — analytics (P0.11)', () => {
+  it('reports the deeplink tap alongside the failure heuristic', () => {
+    setMobile(true);
+    render(<PayZone intent={INTENT} errors={[]} qr={QR} />);
+    const link = screen.getByRole('link', { name: strings.payWithUpiApp });
+    link.addEventListener('click', (event) => event.preventDefault());
+
+    fireEvent.click(link);
+
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: 'pay_clicked',
+      method: 'deeplink',
+      amount: 150,
+    });
+  });
+
+  it('reports a copy on either device', async () => {
+    for (const mobile of [true, false]) {
+      setMobile(mobile);
+      const { unmount } = render(<PayZone intent={INTENT} errors={[]} qr={QR} />);
+      await userEvent.click(screen.getByRole('button', { name: strings.copyUpiId }));
+
+      expect(track).toHaveBeenCalledExactlyOnceWith({
+        name: 'pay_clicked',
+        method: 'copy_vpa',
+        amount: 150,
+      });
+      vi.mocked(track).mockClear();
+      unmount();
+    }
+  });
+
+  it('reports a QR download', async () => {
+    setMobile(false);
+    render(<PayZone intent={INTENT} errors={[]} qr={QR} />);
+    await userEvent.click(screen.getByRole('button', { name: strings.qrDownload }));
+
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: 'pay_clicked',
+      method: 'qr_download',
+      amount: 150,
+    });
+  });
+
+  it('reports the mobile QR once per session, however often it is reopened', async () => {
+    setMobile(true);
+    render(<PayZone intent={INTENT} errors={[]} qr={QR} />);
+    const toggle = screen.getByRole('button', { name: strings.showQr });
+
+    await userEvent.click(toggle);
+    await userEvent.click(screen.getByRole('button', { name: strings.hideQr }));
+    await userEvent.click(screen.getByRole('button', { name: strings.showQr }));
+
+    expect(vi.mocked(track).mock.calls.filter(([e]) => e.name === 'pay_clicked')).toHaveLength(1);
+    expect(track).toHaveBeenCalledWith({ name: 'pay_clicked', method: 'qr_view', amount: 150 });
+  });
+
+  it('never reports qr_view on desktop, where the QR was always visible', () => {
+    setMobile(false);
+    render(<PayZone intent={INTENT} errors={[]} qr={QR} />);
+
+    expect(screen.getByRole('img', { name: /UPI QR code/ })).toBeInTheDocument();
+    expect(track).not.toHaveBeenCalled();
   });
 });

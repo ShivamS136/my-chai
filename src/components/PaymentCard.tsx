@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { track } from '../analytics/index.ts';
 import type { ChaiConfig } from '../config/schema.ts';
 import { useUpiIntent } from '../hooks/useUpiIntent.ts';
 import { formatRupees, parseRupees, presetAmount, sanitizeAmountInput } from '../lib/amount.ts';
@@ -25,6 +26,13 @@ import { PayZone } from './PayZone.tsx';
 
 /** Emoji detection for the "some apps drop emojis" nudge. Non-global: no lastIndex state. */
 const EMOJI_RE = /\p{Extended_Pictographic}/u;
+
+/**
+ * How long a custom amount must hold still before it counts as chosen
+ * (docs/ANALYTICS.md). Typing "150" is three keystrokes, not three decisions —
+ * without this the "popular amounts" chart would be a histogram of prefixes.
+ */
+const CUSTOM_AMOUNT_DEBOUNCE_MS = 800;
 
 type Selection =
   | { readonly kind: 'preset'; readonly chaiCount: number }
@@ -66,7 +74,26 @@ export function PaymentCard({ config }: PaymentCardProps): JSX.Element {
     // Clearing avoids two competing numbers on screen — a filled custom field
     // next to a selected chip reads as ambiguous about what is actually payable.
     setCustomInput('');
+    // A chip is one deliberate act, so it reports immediately — unlike the custom
+    // field below, which has to wait for the donor to stop typing.
+    track({
+      name: 'amount_selected',
+      amount: presetAmount(chaiCount, chai.basePrice),
+      preset: true,
+    });
   };
+
+  // A custom amount is only "selected" once the donor stops typing. The effect keys
+  // off the parsed rupee value rather than the raw string, so "0150" and "150" are
+  // the same decision and deleting back to an unpayable value reports nothing.
+  const customRupees = selection.kind === 'custom' ? parseRupees(customInput) : null;
+  useEffect(() => {
+    if (customRupees === null) return;
+    const timer = setTimeout(() => {
+      track({ name: 'amount_selected', amount: customRupees, preset: false });
+    }, CUSTOM_AMOUNT_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [customRupees]);
 
   const handleCustomChange = (raw: string): void => {
     setCustomInput(sanitizeAmountInput(raw));
