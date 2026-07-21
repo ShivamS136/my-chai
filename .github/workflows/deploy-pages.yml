@@ -1,0 +1,82 @@
+name: Deploy to GitHub Pages
+
+# The default deploy path (P0.9, ADR-005). A fork enables it once —
+# Settings → Pages → Source: GitHub Actions — and every push to main republishes.
+#
+# Nothing in here is repo-specific: `BASE_PATH` is derived from the repository's own
+# name, so a fork renamed to `chai` or `support-me` builds correct asset paths with
+# no edit. Custom domains set the `CHAI_BASE_PATH` variable instead — see below.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time, and never cancel one midway: a cancelled deploy can leave
+# Pages serving a half-published build.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Reads the pnpm version from package.json "packageManager".
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/configure-pages@v5
+
+      - name: Build
+        # `build:deploy` runs the placeholder guard first (ADR-013), so a fork that
+        # has not replaced the example UPI ID fails here rather than publishing a
+        # page that points at nobody.
+        run: pnpm build:deploy
+        env:
+          # A project served at https://<user>.github.io/<repo>/ needs every asset
+          # path prefixed with /<repo>/ (hard rule 7). A custom domain serves from
+          # the root instead, so set the repository variable CHAI_BASE_PATH to "/"
+          # (Settings → Secrets and variables → Actions → Variables) — and remember
+          # the CNAME file belongs in public/, which Vite copies into dist verbatim.
+          BASE_PATH: ${{ vars.CHAI_BASE_PATH || format('/{0}/', github.event.repository.name) }}
+          # Optional, and public by nature: a PostHog *project* key (phc_…) only
+          # allows writing events. `vars` is the documented home for it; `secrets` is
+          # accepted too, because that is where people put anything key-shaped.
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY || secrets.VITE_POSTHOG_KEY }}
+          # Canonical-repo demo only: publish the shipped example page past the
+          # placeholder guard (ADR-013). Left UNSET in every fork — repository variables
+          # are not copied by "Use this template" — so a fork still cannot deploy the
+          # example page. Only the repo that explicitly sets CHAI_ALLOW_PLACEHOLDER=1
+          # (the canonical repo, to host the live demo) bypasses the guard.
+          CHAI_ALLOW_PLACEHOLDER: ${{ vars.CHAI_ALLOW_PLACEHOLDER }}
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

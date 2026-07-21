@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+*.tsbuildinfo
+
+# Env — analytics keys come from the host's env vars, never a committed file
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Hosting
+.vercel
+
+# NOTE: chai.config.ts is deliberately NOT ignored. It is the creator's file and
+# the whole point of the fork — it must be committed for the build to deploy.

@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // vite.config.ts and the read-config helper it imports use only `import.meta.url`
+    // (standard ESM) and `loadEnv` (typed by the `vite` package), so node types
+    // suffice — the config no longer reads `import.meta.env` now that chai.config.ts
+    // (and its inlined VITE_POSTHOG_KEY) is gone (ADR-030).
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["vite.config.ts"]
+}

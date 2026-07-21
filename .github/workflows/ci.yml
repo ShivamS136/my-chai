@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Reads the pnpm version from package.json "packageManager".
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # Single source of truth for the Node version; see also .node-version.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Check the committed JSON Schema matches the Zod schema
+        # The creator's editor autocomplete comes from chai.schema.json (ADR-030); if
+        # it drifts from src/config/schema.ts it starts lying. This regenerates and
+        # diffs, failing when the committed file is stale.
+        run: pnpm check:schema
+
+      - name: Test with coverage
+        # Enforces 100% branch coverage on the UPI builder and the config validator.
+        run: pnpm test:coverage
+
+      - name: Validate the example config
+        run: pnpm check:config
+
+      - name: Build (Vercel / custom-domain layout)
+        run: pnpm build
+
+      - name: Assert a disabled build ships no analytics bytes
+        # Hard rule 4 says a disabled build makes no network calls; ADR-028 goes
+        # further and says the code is not even there. The example config declares no
+        # `analytics` block, so `__CHAI_ANALYTICS__` folds to false and Rollup drops
+        # the whole PostHog chunk. That only holds while `import()` stays lexically
+        # inside the flag's branch in src/analytics/index.ts — a refactor that hoists
+        # it still passes every unit test and silently ships ~220 kB to every fork.
+        # This step is the only thing that notices.
+        run: |
+          if grep -rl 'disable_session_recording\|__PosthogExtensions__' dist/; then
+            echo "::error::dist/ contains PostHog bytes, but chai.config.ts declares no analytics block."
+            echo "See ADR-028 and the note above the ternary in src/analytics/index.ts."
+            exit 1
+          fi
+          echo "✓ no analytics bytes in a disabled build"
+
+      - name: Build on a GitHub Pages subpath
+        # Hard rule 7: every asset path must respect Vite `base`. Building the
+        # subpath layout in CI is what stops an absolute path shipping.
+        run: BASE_PATH=/buy-me-a-chai/ pnpm build
+
+      - name: Assert subpath assets are actually rewritten
+        run: |
+          if ! grep -q 'src="/buy-me-a-chai/assets/' dist/index.html; then
+            echo "::error::dist/index.html does not reference the /buy-me-a-chai/ subpath."
+            echo "Emitted asset references were:"
+            grep -o 'src="[^"]*"\|href="[^"]*"' dist/index.html || true
+            exit 1
+          fi
+          echo "✓ assets are rewritten under the Pages subpath"
+
+      - name: Assert the placeholder guard rejects the shipped example
+        # A NEGATIVE test, and the point of the whole guard. This repo ships an
+        # example config with `yourname@bank`, which is a valid VPA *format* and so
+        # passes the schema on purpose. If this step ever succeeds, the guard has
+        # stopped protecting forks from deploying a page that points at nobody.
+        run: |
+          if pnpm check:placeholder; then
+            echo "::error::check:placeholder accepted the shipped example config — the deploy guard is broken."
+            exit 1
+          fi
+          echo "✓ the guard correctly refuses to deploy the example config"

@@ -1,0 +1,306 @@
+@import "tailwindcss";
+
+/*
+ * Theme tokens as CSS custom properties (DESIGN.md §Visual language).
+ *
+ * Two layers on purpose:
+ *  1. `:root` holds the semantic values, and is the layer a creator's
+ *     `theme.accent` overrides at runtime (see src/lib/theme.ts).
+ *  2. `@theme inline` maps them to Tailwind utilities. `inline` matters — it
+ *     makes utilities emit `var(--chai-*)` rather than baking the value in, so
+ *     the dark-mode block below and any runtime override actually take effect.
+ *
+ * Light is the default palette. Dark is applied by TWO paths (ADR-021):
+ *  - `@media (prefers-color-scheme: dark)` for `theme.mode: 'auto'` (the default),
+ *    scoped `:not([data-theme="light"])` so a creator who pinned light wins even on
+ *    a dark OS;
+ *  - `:root[data-theme="dark"]` for `theme.mode: 'dark'`, stamped on <html> at build
+ *    time (flash-free) and re-affirmed at runtime.
+ * The two dark blocks are identical and MUST stay in sync.
+ *
+ * Keeping the palette in plain custom properties is also what lets the v1 widget
+ * reuse it without shipping Tailwind (ARCHITECTURE.md).
+ *
+ * Every pairing here was measured with `src/config/css-color.ts`, the same
+ * contrast code the build warns with. Ratios are noted where they constrain the
+ * design rather than merely pass.
+ */
+:root {
+  color-scheme: light dark;
+
+  --chai-bg: #faf8f4; /* warm off-white — the brand canvas, not creator-themeable */
+  --chai-surface: #ffffff;
+  --chai-ink: #2b1d14; /* dark brew — 16.3:1 on surface */
+  --chai-ink-muted: #6b5647; /* 6.9:1 on surface */
+  --chai-line: rgb(43 29 20 / 0.14);
+  --chai-line-strong: rgb(43 29 20 / 0.28);
+
+  --chai-accent: #c4622d; /* masala terracotta — 4.1:1, LARGE text only */
+  --chai-accent-soft: #fbeadf;
+  /*
+   * The accent is 4.09:1 against white, which clears WCAG 1.4.11 for UI fills
+   * but NOT 1.4.3 for normal-size text on top of it. `accent-strong` is the
+   * darkened variant reserved for anything that puts white text on a filled
+   * accent surface (5.7:1). Selected chips deliberately use the soft tint with
+   * ink text instead — see PaymentCard.
+   */
+  --chai-accent-strong: #a34e22;
+  --chai-accent-ink: #ffffff;
+
+  --chai-warn: #8a5a12; /* 5.9:1 */
+  --chai-error: #b3261e; /* 6.5:1 */
+}
+
+/* Dark palette — keep identical to :root[data-theme="dark"] below. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chai-bg: #1a130e;
+    --chai-surface: #241b14;
+    --chai-ink: #f3e9df; /* 14.1:1 on surface */
+    --chai-ink-muted: #b9a798; /* 7.3:1 */
+    --chai-line: rgb(243 233 223 / 0.14);
+    --chai-line-strong: rgb(243 233 223 / 0.3);
+
+    /* Lifted so the accent still reads as terracotta against a dark brew. */
+    --chai-accent: #e08a4f; /* 6.4:1 */
+    --chai-accent-soft: #3a2a1e;
+    --chai-accent-strong: #e08a4f;
+    --chai-accent-ink: #241b14;
+
+    --chai-warn: #e3b778; /* 9.1:1 */
+    --chai-error: #f2b8b5; /* 9.9:1 */
+  }
+}
+
+/* Forced dark (theme.mode: 'dark') — identical to the @media block above. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --chai-bg: #1a130e;
+  --chai-surface: #241b14;
+  --chai-ink: #f3e9df;
+  --chai-ink-muted: #b9a798;
+  --chai-line: rgb(243 233 223 / 0.14);
+  --chai-line-strong: rgb(243 233 223 / 0.3);
+
+  --chai-accent: #e08a4f;
+  --chai-accent-soft: #3a2a1e;
+  --chai-accent-strong: #e08a4f;
+  --chai-accent-ink: #241b14;
+
+  --chai-warn: #e3b778;
+  --chai-error: #f2b8b5;
+}
+
+/* Forced light (theme.mode: 'light') — the :root defaults already carry the
+ * palette; this only pins color-scheme so form controls match. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-chai-bg: var(--chai-bg);
+  --color-chai-surface: var(--chai-surface);
+  --color-chai-ink: var(--chai-ink);
+  --color-chai-muted: var(--chai-ink-muted);
+  --color-chai-line: var(--chai-line);
+  --color-chai-line-strong: var(--chai-line-strong);
+  --color-chai-accent: var(--chai-accent);
+  --color-chai-accent-soft: var(--chai-accent-soft);
+  --color-chai-accent-strong: var(--chai-accent-strong);
+  --color-chai-accent-ink: var(--chai-accent-ink);
+  --color-chai-warn: var(--chai-warn);
+  --color-chai-error: var(--chai-error);
+
+  /*
+   * No webfont: external font CDNs are rejected on privacy grounds
+   * (ARCHITECTURE.md), and self-hosting binaries is Session 4's call. Character
+   * comes from scale, weight and tracking instead — a tiny letter-spaced label
+   * against a very large, tightly-tracked numeral.
+   *
+   * `--font-vpa` is monospace for a functional reason, not a stylistic one: a VPA
+   * is an identifier donors must verify character by character, and fixed-width
+   * glyphs are what make a transposed character visible.
+   */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-vpa: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@layer base {
+  /*
+   * The canvas is a flat, warm off-white — brand-locked and identical for every fork
+   * (only the accent is creator-themeable, ADR-025). Warmth lives in the accent, the
+   * dark-brew ink and the ☕ marks, never in the background: a tinted canvas is the
+   * one thing a custom accent must not fight, so the page stays clean and whitish.
+   */
+  body {
+    background-color: var(--chai-bg);
+    color: var(--chai-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Amounts change while the donor types. Proportional digits reflow the line on
+   * every keystroke; tabular ones hold their column.
+   */
+  input,
+  .chai-numeral {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--chai-accent);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * The tear line.
+ *
+ * Above it is what the donor chooses; below it is what they carry to their UPI
+ * app. That is a real seam in the flow, and a chai stall's ticket stub is the
+ * artifact it borrows from — the page is meant to feel like a tapri, not a
+ * checkout counter (DESIGN.md §1).
+ *
+ * The notches are filled with the page background, so the card reads as torn
+ * rather than drawn.
+ */
+.chai-tear {
+  position: relative;
+  height: 0;
+  border-top: 2px dashed var(--chai-line-strong);
+}
+
+.chai-tear::before,
+.chai-tear::after {
+  content: "";
+  position: absolute;
+  top: -13px;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background-color: var(--chai-bg);
+}
+
+.chai-tear::before {
+  left: -13px;
+}
+
+.chai-tear::after {
+  right: -13px;
+}
+
+/*
+ * Page layout (DESIGN.md §anatomy, ADR-024).
+ *
+ * One grid, two shapes. On mobile it is a single column in reading order —
+ * profile → payment → projects — which is the exact order the DOM already sits in.
+ * On desktop (≥1024px) it becomes two columns: the creator's identity and projects
+ * on the left, the payment ticket alone on the right, spanning both left rows so it
+ * can stay pinned (`position: sticky`) and always-visible while the left scrolls.
+ * The masthead and footer live outside this grid, so they stay full-width.
+ *
+ * grid-template-areas rather than source reordering: it keeps the DOM in reading
+ * order (which is also the mobile order and the tab order) while the payment moves
+ * to its own column purely in the layout.
+ */
+.chai-grid {
+  display: grid;
+  gap: 1.75rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "profile"
+    "payment"
+    "works";
+}
+
+.chai-area-profile {
+  grid-area: profile;
+}
+.chai-area-payment {
+  grid-area: payment;
+}
+.chai-area-works {
+  grid-area: works;
+}
+
+@media (min-width: 1024px) {
+  .chai-grid {
+    gap: 2.5rem 2.75rem;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    /*
+     * Three rows, not two. The payment ticket usually stands taller than the
+     * profile + projects stacked beside it; without the trailing `1fr` filler row,
+     * that extra height inflates the profile/works rows and the projects drift to
+     * the vertical middle. The filler soaks up the slack instead, so the left
+     * column stays compact at the top while the ticket spans full height (and has
+     * the room it needs to stay pinned).
+     */
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "profile payment"
+      "works   payment"
+      ".       payment";
+  }
+}
+
+/* QR crossfade on regenerate — 150ms, micro only (DESIGN.md §Motion). */
+@keyframes chai-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.chai-fade-in {
+  animation: chai-fade-in 150ms ease-out;
+}
+
+/*
+ * Entrance: sections rise in on load, staggered by the caller. One orchestrated
+ * moment, not scattered effects (DESIGN.md §Motion) — and off entirely under
+ * reduced-motion.
+ */
+@keyframes chai-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.chai-rise {
+  animation: chai-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Copy-toast slide-up (DESIGN.md §Motion). */
+@keyframes chai-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chai-toast-in {
+  animation: chai-toast-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chai-fade-in,
+  .chai-toast-in,
+  .chai-rise {
+    animation: none;
+  }
+}

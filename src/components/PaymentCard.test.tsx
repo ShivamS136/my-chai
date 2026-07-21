@@ -1,0 +1,326 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { type ChaiConfig, type ChaiConfigInput, chaiConfigSchema } from '../config/schema.ts';
+import { MAX_NOTE_LENGTH } from '../lib/upi.ts';
+import { strings } from '../strings.ts';
+import { PaymentCard } from './PaymentCard.tsx';
+
+// Analytics is a seam, not a behaviour: mocking the whole module keeps the card
+// inert in every case below and gives the reporting cases something to assert on.
+vi.mock('../analytics/index.ts', () => ({ track: vi.fn() }));
+const { track } = await import('../analytics/index.ts');
+
+/**
+ * Fixtures go through the real schema rather than hand-built objects, so these
+ * tests exercise the same defaults a deployed page gets.
+ */
+const PRESETS = [
+  { label: 'Cutting chai', amount: 20, emoji: '☕' },
+  { label: 'Chai for me and you', amount: 50, emoji: '☕☕' },
+  { label: '2 chai + chips', amount: 100, emoji: '☕☕🍟' },
+];
+
+const configFor = (overrides: Partial<ChaiConfigInput> = {}): ChaiConfig =>
+  chaiConfigSchema.parse({
+    creator: { name: 'Shivam Sharma', vpa: 'shivam@okaxis' },
+    chai: { presets: PRESETS, defaultNote: 'Chai for your work' },
+    ...overrides,
+  });
+
+const setup = (overrides: Partial<ChaiConfigInput> = {}) => {
+  const user = userEvent.setup();
+  render(<PaymentCard config={configFor(overrides)} />);
+  return user;
+};
+
+/** The QR's alt text carries the amount, so it doubles as an assertion target. */
+const qrAltAmount = (): string => {
+  const image = screen.getByRole('img', { name: /UPI QR code/ });
+  const alt = image.getAttribute('alt') ?? '';
+  return alt.replace(/^.*amount ₹/, '');
+};
+
+/**
+ * Chips are addressed by the label a donor actually reads. A function matcher,
+ * not a regex: tier names are creator prose and "2 chai + chips" is a valid one.
+ */
+const chip = (label: string): HTMLElement =>
+  screen.getByRole('radio', { name: (name: string) => name.startsWith(`${label},`) });
+
+afterEach(() => {
+  vi.mocked(track).mockClear();
+});
+
+describe('PaymentCard — amount selection (P0.3)', () => {
+  it('selects the cheapest chip by default and shows its QR', () => {
+    setup();
+    expect(chip('Cutting chai')).toBeChecked();
+    expect(qrAltAmount()).toBe('20');
+  });
+
+  it('renders one chip per configured preset, named and priced', () => {
+    setup();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    expect(chip('Chai for me and you')).toHaveAccessibleName('Chai for me and you, ₹50');
+    expect(screen.getByText('2 chai + chips')).toBeInTheDocument();
+  });
+
+  it('regenerates the QR when a different preset is chosen', async () => {
+    const user = setup();
+    await user.click(chip('2 chai + chips'));
+    expect(chip('2 chai + chips')).toBeChecked();
+    expect(chip('Cutting chai')).not.toBeChecked();
+    expect(qrAltAmount()).toBe('100');
+  });
+
+  it('shows the emoji as decoration, keeping it out of the accessible name', () => {
+    setup();
+    expect(screen.getByText('☕☕🍟')).toBeInTheDocument();
+    // A screen reader hears the label and the price, never "coffee coffee fries".
+    expect(chip('2 chai + chips')).toHaveAccessibleName('2 chai + chips, ₹100');
+  });
+
+  it('renders a chip with no emoji at all', () => {
+    setup({ chai: { presets: [{ label: 'Plain', amount: 20 }] } });
+    expect(chip('Plain')).toHaveAccessibleName('Plain, ₹20');
+    expect(screen.queryByText('☕')).not.toBeInTheDocument();
+  });
+
+  it('orders the chips by amount whatever order the creator wrote them in', () => {
+    setup({
+      chai: {
+        presets: [
+          { label: 'Big', amount: 100 },
+          { label: 'Small', amount: 20 },
+        ],
+      },
+    });
+    expect(screen.getAllByRole('radio').map((r) => r.getAttribute('value'))).toEqual(['20', '100']);
+    expect(chip('Small')).toBeChecked();
+  });
+
+  it('moves selection with arrow keys, as a radiogroup must (DESIGN.md a11y)', async () => {
+    const user = setup();
+    await user.tab();
+    expect(chip('Cutting chai')).toHaveFocus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(chip('Chai for me and you')).toBeChecked();
+    expect(qrAltAmount()).toBe('50');
+
+    // Wrapping is part of the native radiogroup contract.
+    await user.keyboard('{ArrowRight}{ArrowRight}');
+    expect(chip('Cutting chai')).toBeChecked();
+  });
+
+  it('exposes exactly one tab stop for the whole group', async () => {
+    const user = setup();
+    await user.tab();
+    expect(chip('Cutting chai')).toHaveFocus();
+    await user.tab();
+    expect(chip('Chai for me and you')).not.toHaveFocus();
+    expect(chip('2 chai + chips')).not.toHaveFocus();
+  });
+
+  it('pays the custom amount once one is typed', async () => {
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.customAmountLabel), '777');
+    expect(qrAltAmount()).toBe('777');
+  });
+
+  it('deselects every chip while a custom amount is active', async () => {
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.customAmountLabel), '777');
+    for (const preset of PRESETS) expect(chip(preset.label)).not.toBeChecked();
+  });
+
+  it('clears the custom amount when a chip is chosen again', async () => {
+    // Two competing numbers on screen would be ambiguous about what is payable.
+    const user = setup();
+    const custom = screen.getByLabelText(strings.customAmountLabel);
+    await user.type(custom, '777');
+    await user.click(chip('Chai for me and you'));
+    expect(custom).toHaveValue('');
+    expect(qrAltAmount()).toBe('50');
+  });
+
+  it('ignores non-numeric input rather than rejecting the keystroke', async () => {
+    const user = setup();
+    const custom = screen.getByLabelText(strings.customAmountLabel);
+    await user.type(custom, '₹1,500');
+    expect(custom).toHaveValue('1500');
+  });
+
+  it('prompts for an amount instead of showing a QR when the field is emptied', async () => {
+    const user = setup();
+    const custom = screen.getByLabelText(strings.customAmountLabel);
+    await user.type(custom, '5');
+    await user.clear(custom);
+
+    expect(screen.queryByRole('img', { name: /UPI QR code/ })).not.toBeInTheDocument();
+    expect(screen.getByText(strings.amountPrompt)).toBeInTheDocument();
+  });
+
+  it('warns above the soft cap but still pays (P0.3)', async () => {
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.customAmountLabel), '200000');
+
+    expect(screen.getByText(strings.largeAmountWarning)).toBeInTheDocument();
+    // Warn, never block: the QR is still there.
+    expect(qrAltAmount()).toBe('2,00,000');
+  });
+
+  it('shows no warning at or below the soft cap', async () => {
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.customAmountLabel), '100000');
+    expect(screen.queryByText(strings.largeAmountWarning)).not.toBeInTheDocument();
+  });
+
+  it('hides the custom field when the creator disables it', () => {
+    setup({ chai: { presets: PRESETS, allowCustomAmount: false } });
+    expect(screen.queryByLabelText(strings.customAmountLabel)).not.toBeInTheDocument();
+  });
+
+  it('shows the resolved amount and VPA together so donors can verify', () => {
+    setup();
+    expect(screen.getByText(strings.payingTo('20', 'shivam@okaxis'))).toBeInTheDocument();
+  });
+});
+
+describe('PaymentCard — donor message (P0.4)', () => {
+  it('counts what the donor has typed against the UPI note limit', async () => {
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.messageLabel), 'thanks');
+    expect(screen.getByText(strings.messageCounter(6, MAX_NOTE_LENGTH))).toBeInTheDocument();
+  });
+
+  it('stops accepting input at the note limit', async () => {
+    const user = setup();
+    const field = screen.getByLabelText(strings.messageLabel);
+    await user.type(field, 'a'.repeat(MAX_NOTE_LENGTH + 20));
+    expect(field).toHaveValue('a'.repeat(MAX_NOTE_LENGTH));
+  });
+
+  it('counts by code point, so an emoji is one character not two', async () => {
+    // UTF-16 length would say 2 and clip mid-surrogate, which throws in
+    // encodeURIComponent — the crash upi.ts guards against.
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.messageLabel), '🙏');
+    expect(screen.getByText(strings.messageCounter(1, MAX_NOTE_LENGTH))).toBeInTheDocument();
+  });
+
+  it('warns that some apps drop emoji, without blocking them', async () => {
+    const user = setup();
+    const field = screen.getByLabelText(strings.messageLabel);
+    await user.type(field, 'chai 🙏');
+
+    expect(screen.getByText(strings.messageEmojiWarning)).toBeInTheDocument();
+    expect(field).toHaveValue('chai 🙏');
+  });
+
+  it('shows no emoji warning for plain text', async () => {
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.messageLabel), 'thanks a lot');
+    expect(screen.queryByText(strings.messageEmojiWarning)).not.toBeInTheDocument();
+  });
+
+  it("offers the creator's default note as the placeholder", () => {
+    setup();
+    expect(screen.getByLabelText(strings.messageLabel)).toHaveAttribute(
+      'placeholder',
+      'Chai for your work',
+    );
+  });
+
+  it('lets a donor type a space mid-message without it being trimmed away', async () => {
+    // Sanitising on each keystroke would eat the trailing space and make the
+    // next word impossible to start.
+    const user = setup();
+    const field = screen.getByLabelText(strings.messageLabel);
+    await user.type(field, 'thanks ');
+    expect(field).toHaveValue('thanks ');
+  });
+
+  it('hides the message field when the creator disables it', () => {
+    setup({ chai: { presets: PRESETS, allowDonorMessage: false } });
+    expect(screen.queryByLabelText(strings.messageLabel)).not.toBeInTheDocument();
+  });
+});
+
+describe('PaymentCard — analytics (P0.11)', () => {
+  it('reports a preset chip immediately, as one deliberate act', async () => {
+    const user = setup();
+    await user.click(chip('Chai for me and you'));
+
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: 'amount_selected',
+      amount: 50,
+      preset: true,
+    });
+  });
+
+  it('reports a custom amount only once the donor stops typing', () => {
+    vi.useFakeTimers();
+    try {
+      render(<PaymentCard config={configFor()} />);
+      const custom = screen.getByLabelText(strings.customAmountLabel);
+
+      // Three keystrokes are one decision, not three: "1", "15", "150".
+      fireEvent.change(custom, { target: { value: '1' } });
+      act(() => vi.advanceTimersByTime(400));
+      fireEvent.change(custom, { target: { value: '15' } });
+      act(() => vi.advanceTimersByTime(400));
+      fireEvent.change(custom, { target: { value: '150' } });
+      expect(track).not.toHaveBeenCalled();
+
+      act(() => vi.advanceTimersByTime(800));
+      expect(track).toHaveBeenCalledExactlyOnceWith({
+        name: 'amount_selected',
+        amount: 150,
+        preset: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports nothing for a custom field cleared back to empty', () => {
+    vi.useFakeTimers();
+    try {
+      render(<PaymentCard config={configFor()} />);
+      const custom = screen.getByLabelText(strings.customAmountLabel);
+
+      fireEvent.change(custom, { target: { value: '9' } });
+      fireEvent.change(custom, { target: { value: '' } });
+      act(() => vi.advanceTimersByTime(2000));
+
+      expect(track).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never puts the donor message into an event (hard rule 5)', async () => {
+    const user = setup();
+    await user.type(screen.getByLabelText(strings.messageLabel), 'from Ananya');
+    await user.click(chip('2 chai + chips'));
+
+    expect(JSON.stringify(vi.mocked(track).mock.calls)).not.toContain('Ananya');
+  });
+});
+
+describe('PaymentCard — honest UX', () => {
+  it('never implies the payment completed', () => {
+    setup();
+    expect(screen.getByText(strings.noConfirmationNote)).toBeInTheDocument();
+    expect(document.body.textContent ?? '').not.toMatch(
+      /thank you for your donation|payment (received|successful)|transaction successful/i,
+    );
+  });
+
+  it('keeps the QR available for a donor who has typed nothing but an amount', () => {
+    setup();
+    expect(screen.getByRole('img', { name: /UPI QR code/ })).toBeInTheDocument();
+  });
+});
