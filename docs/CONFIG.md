@@ -84,6 +84,7 @@ export default defineConfig({
 | `theme.mode` | `light` \| `dark` \| `auto` (default). `light`/`dark` pin the palette via `data-theme`; the accent is derived into contrast-safe `-strong`/`-soft` tokens per surface (ADR-021) | Build fails on any other value |
 | core palette (bg / surface / ink) | Brand-locked — not configurable. Only `theme.accent` recolours the page, and never the canvas (ADR-025) | n/a (no such key) |
 | `analytics.apiKey` empty while provider set | — | Warn + analytics silently disabled (fork-safety) |
+| `analytics` block absent (the default) | — | No adapter, no requests, and **no PostHog code in the build at all** — the chunk is tree-shaken out (ADR-028) |
 | Unknown top-level keys | `.strict()` (spelled `z.strictObject` in Zod v4) | Build fails, with a did-you-mean suggestion (catches typos like `cretor`) |
 | `chai.basePrice` × largest preset | > `maxAmountWarning` | Warn only |
 | Amount passed to the URI builder | whole rupees, ₹1 – ₹1,00,00,000 | Rejected by `buildUpiUri` (ADR-011). The ₹1 crore ceiling is a numeric-integrity guard, not policy: above it `toFixed(2)` goes exponential |
@@ -118,6 +119,7 @@ regex", and Zod cannot autocomplete. See ADR-016.
 - **TS file, not env vars / JSON:** nested content (works, socials) is miserable in env vars; `.ts` gives autocomplete via `defineConfig`, comments, and `import.meta.env` interop where env vars *do* belong (analytics keys).
 - **`.strict()` everywhere:** creators are the users; a silent typo = broken page they can't debug.
 - **Env only for secrets-shaped values:** even though PostHog keys are public, the pattern prevents forks shipping the canonical repo's key and teaches good hygiene.
+- **Presence of the `analytics` block is a build-time signal, not just a runtime one:** it is read straight off the raw config to decide whether the PostHog chunk is emitted at all. That is why commenting the block out is meaningfully different from leaving it in place with no key — the first ships nothing, the second ships a chunk that never runs (ADR-028).
 - **`meta.language` reserved:** schema stability > YAGNI here; adding it later would be a breaking change for i18n adopters.
 
 ## Versioning

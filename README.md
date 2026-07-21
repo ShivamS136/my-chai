@@ -1,5 +1,11 @@
 # ☕ buy-me-a-chai
 
+[![CI](https://github.com/shivams136/buy-me-a-chai/actions/workflows/ci.yml/badge.svg)](https://github.com/shivams136/buy-me-a-chai/actions/workflows/ci.yml)
+[![Deploy to Pages](https://github.com/shivams136/buy-me-a-chai/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/shivams136/buy-me-a-chai/actions/workflows/deploy-pages.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-C4622D)](LICENSE)
+[![Node](https://img.shields.io/badge/node-24-C4622D)](.nvmrc)
+[![Commission](https://img.shields.io/badge/commission-0%25-C4622D)](#the-honest-fine-print)
+
 **Zero commission. Zero platform. Zero signup. Your donation page, your UPI, your host.**
 
 A self-hosted "Buy Me a Chai" page for Indian creators. Fork it, edit one config file, deploy free on GitHub Pages or Vercel. Donors pay you **directly** over UPI — scan a QR, copy your UPI ID, or one-tap into their UPI app. No middleman ever touches the money, so no one can take a cut.
@@ -15,7 +21,7 @@ A self-hosted "Buy Me a Chai" page for Indian creators. Fork it, edit one config
 - 📱 **Works on every device** — live QR (desktop), UPI-app deeplink + Copy-UPI-ID (mobile), honest fallbacks where GPay/PhonePe block browser intents.
 - ☕ **Chai-priced presets** — set your base price; donors pick 1/3/5 chai or a custom amount with a personal message.
 - 🧾 **Typed config, loud failures** — Zod-validated; a typo'd UPI ID fails the build, not your donors.
-- 📊 **Optional, privacy-first analytics** — off by default; PostHog adapter for views/amount-clicks. No donor data, ever.
+- 📊 **Optional, privacy-first analytics** — off by default, and off means *absent*: a default build contains no tracking code to audit. Turn it on and you get three events, with autocapture and session recording switched off. No donor data, ever.
 - 🧩 **Embeddable widget** *(v1, in progress)* — `<chai-widget>` web component for any site.
 - 🔓 **MIT licensed, fully static** — no backend, no database, no accounts. Audit every line.
 

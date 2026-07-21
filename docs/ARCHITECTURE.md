@@ -13,7 +13,7 @@
 | Tests | Vitest + @testing-library/react + `jsqr` (decode QRs in tests) | URI builder & QR round-trip provable in CI |
 | Package mgr | pnpm (Node 24) | Workspaces-ready for v1 monorepo. Node 24 strips TS types natively, so build scripts need no `tsx`/`ts-node` |
 | CI/CD | GitHub Actions | lint + typecheck + test + build (root **and** subpath) on PR; deploy to Pages on main |
-| Analytics | Adapter interface; PostHog adapter (lazy-loaded only when enabled) | Optional by contract, not by if-statements scattered around |
+| Analytics | Adapter interface; PostHog adapter behind a build-time flag (ADR-028) | Optional by contract, not by if-statements scattered around — and a disabled build ships none of it |
 | Lint/format | Biome | One binary, one config; enforces "no `any`" and the default-export rule that `tsc` cannot |
 
 **Explicit rejections:** Next.js (no SSR need; static export friction), any backend/serverless (see CLAUDE.md hard rule 1), CSS-in-JS (widget portability), external font/icon CDNs (privacy).
@@ -28,15 +28,15 @@ buy-me-a-chai/
 ├── LICENSE                    # MIT
 ├── chai.config.ts             # ← the creator's file (example ships pre-filled)
 ├── index.html
-├── vite.config.ts             # base: env BASE_PATH || '/'; chai-config-validator + chai-noscript + chai-head plugins
+├── vite.config.ts             # base: env BASE_PATH || '/'; chai-config-validator + chai-analytics-flag + chai-noscript + chai-head plugins
 ├── biome.jsonc                # lint + format
 ├── tsconfig.json              # solution: references app / node / scripts projects
 ├── .nvmrc  .node-version      # Node 24
 ├── package.json
 ├── docs/                      # PRD, DESIGN, ARCHITECTURE, CONFIG, DECISIONS, ROADMAP, SETUP, COMPAT
 ├── .github/workflows/
-│   ├── ci.yml                 # PR: lint, typecheck, test+coverage, build, subpath build, guard negative test
-│   └── deploy-pages.yml       # main: build:deploy with BASE_PATH=/buy-me-a-chai/ → Pages
+│   ├── ci.yml                 # PR: lint, typecheck, test+coverage, build, no-analytics-bytes grep, subpath build, guard negative test
+│   └── deploy-pages.yml       # main: build:deploy with BASE_PATH from the repo name → Pages (ADR-029)
 ├── scripts/
 │   ├── check-config.mts       # CI step: Zod-validate chai.config.ts, exit 1 on failure
 │   ├── check-placeholder.mjs  # deploy gate: refuse to ship the unedited example (ADR-013)
@@ -67,9 +67,11 @@ buy-me-a-chai/
     │   ├── referral.ts        # branding-link utm/ref tags + inbound source read (ADR-027)
     │   └── theme.ts           # accent derivation + data-theme apply (DOM, ADR-021)
     ├── analytics/
-    │   ├── types.ts           # AnalyticsAdapter { track(event, props) }
-    │   ├── noop.ts            # default; zero imports, zero network
-    │   └── posthog.ts         # dynamic import('posthog-js') only when enabled
+    │   ├── types.ts           # the ChaiEvent union — the contract ANALYTICS.md documents
+    │   ├── noop.ts            # default; one type import, zero state, zero network
+    │   ├── deferred.ts        # buffers events until the provider chunk arrives; drops on failure
+    │   ├── index.ts           # picks the adapter once; exports `track` — the only call site API
+    │   └── posthog.ts         # the sole posthog-js importer; reached only via a flag-gated import() (ADR-028)
     ├── components/
     │   ├── Masthead.tsx       # locked brand banner + use-this-template CTA (ADR-026, ADR-027)
     │   ├── Profile.tsx  Bio.tsx  Works.tsx   # creator identity + trust (left column)
@@ -108,15 +110,19 @@ On intent click: record `t0`, listen for `visibilitychange` for 1500ms. If docum
 ### Analytics contract
 ```ts
 type ChaiEvent =
-  | { name: 'page_view' }
+  | { name: 'page_view'; source?: string }   // sanitised inbound ?ref= host (ADR-027)
   | { name: 'amount_selected'; amount: number; preset: boolean }
   | { name: 'pay_clicked'; method: 'qr_view' | 'deeplink' | 'copy_vpa' | 'qr_download'; amount: number };
 ```
-Adapter chosen once at startup from config. `noop` is the default export path; PostHog is `import()`-ed lazily so disabled builds ship zero analytics bytes. **Never** track note content, donor identifiers, or IP-adjacent data.
+Call sites import one function, `track(event)`, from `src/analytics/index.ts`; nothing else reaches the adapter. The adapter is chosen once at startup by two gates: the build-time `__CHAI_ANALYTICS__` flag (does the config declare analytics? — decides which *bytes* ship) and the runtime `config.analytics` (is there a key? — decides whether they *run*). See ADR-028; the reason the second exists is that `load.ts` erases the analytics object when `VITE_POSTHOG_KEY` is unset, so a fork that copies a config but not its environment lands on `noop`.
+
+`track` is synchronous, returns nothing, and never throws — a payment path that could be broken by analytics would be a worse trade than no analytics. Events emitted before the PostHog chunk resolves are buffered (cap 20) and replayed; if the chunk never arrives, they are dropped silently.
+
+**Never** track note content, donor identifiers, or IP-adjacent data. Three enforcement layers, because "we were careful" is not a mechanism: the `ChaiEvent` union makes a fourth event a typecheck failure, `src/analytics/contract.test.ts` scans every source file for out-of-contract call sites and for any `fetch`/`sendBeacon`/`XMLHttpRequest` anywhere in `src/`, and the SDK's `before_send` drops any event PostHog generated on its own.
 
 ## Build & deploy
 
-- **GitHub Pages (default):** `deploy-pages.yml` — checkout → pnpm install → `BASE_PATH=/${repo-name}/ pnpm build:deploy` → upload-pages-artifact → deploy. `build:deploy` runs the placeholder guard first (ADR-013), so an unedited fork cannot publish the example page. Uses `${{ github.event.repository.name }}` so renamed forks work untouched.
+- **GitHub Pages (default):** `deploy-pages.yml` — checkout → pnpm install → `BASE_PATH=/${repo-name}/ pnpm build:deploy` → upload-pages-artifact → deploy. `build:deploy` runs the placeholder guard first (ADR-013), so an unedited fork cannot publish the example page. Uses `${{ github.event.repository.name }}` so renamed forks work untouched; a custom domain overrides it with the `CHAI_BASE_PATH` repository variable set to `/` (ADR-029). Deploy deliberately does not re-run lint/tests — CI runs on the same push.
 - **Vercel:** zero config (`dist` output, `pnpm build`); "Deploy" button in README with repo URL pre-filled.
 - **Custom domain:** documented in SETUP.md (CNAME file for Pages / dashboard for Vercel), not automated.
 - SPA with a single route ⇒ no 404 routing hacks needed.
@@ -129,7 +135,8 @@ Adapter chosen once at startup from config. `noop` is the default export path; P
 | QR round-trip | Generate QR → decode the **rendered pixels** and the **downloaded PNG** with `jsqr` → assert exact URI equality. The PNG's zlib stream is separately validated by Node's `inflateSync`, so our encoder is not marking its own homework |
 | Config schema | Valid example passes; each invalid field yields its specific error message |
 | Components | PaymentCard interaction (chip select, custom amount, counter), PayZone device branching (mock `device.ts`) |
-| CI gate | `pnpm verify` on every PR, plus a subpath build, a config-validity check, and a **negative** test asserting the placeholder guard rejects the shipped example (ADR-013) |
+| Analytics | `deferred.ts` buffering/failure/cap in isolation; `selectAdapter` gates; a source scan (`contract.test.ts`) for out-of-contract events and stray network primitives; a rendered-page assertion that a disabled build calls neither `fetch` nor `sendBeacon` |
+| CI gate | `pnpm verify` on every PR, plus a subpath build, a config-validity check, a grep proving a disabled build carries no PostHog bytes (ADR-028), and a **negative** test asserting the placeholder guard rejects the shipped example (ADR-013) |
 
 Manual matrix (community-maintained `docs/COMPAT.md`): {GPay, PhonePe, Paytm, BHIM, CRED} × {Android Chrome, iOS Safari} × {QR scan, upload-QR, deeplink, copy}.
 

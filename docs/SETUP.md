@@ -36,7 +36,12 @@ Commit to `main`. Full field reference: [CONFIG.md](./CONFIG.md).
 
 **Vercel (alternative):** click the Deploy button in the README, import your repo, keep defaults. You get `https://<project>.vercel.app`.
 
-**Custom domain:** Pages → add a `CNAME` file + DNS `CNAME` record ([GitHub docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site)); Vercel → project Settings → Domains.
+**Custom domain (Pages):** three things, and the third is the one people miss.
+1. Put a `CNAME` file containing your domain in **`public/`** (not the repo root) — Vite copies `public/` into the build verbatim.
+2. Add the DNS record ([GitHub docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site)).
+3. Set repository variable **`CHAI_BASE_PATH`** to `/` — Settings → Secrets and variables → Actions → Variables. A custom domain serves from the root, but the workflow otherwise assumes `https://you.github.io/<repo>/` and prefixes every asset with your repo name. Skip this and you get a blank page with 404s on every file.
+
+On **Vercel**, none of that applies: project Settings → Domains, and the base path stays `/`.
 
 ## Step 4 — Look at it
 Open your URL on your phone *and* a desktop. Check: name, avatar, amounts, and that the UPI ID shown next to the QR is **exactly yours**.
@@ -57,9 +62,11 @@ Green? You're live. Share the link. ☕
 - Blog/website button embeds: coming in v1 (`<chai-widget>`), track the [roadmap](./ROADMAP.md).
 
 ## Optional: analytics
+Analytics is **off by default**, and off here means absent: with no `analytics` block your page contains no tracking code at all, makes no requests, and sets nothing in the browser. You can verify that yourself — `pnpm build && grep -rl posthog dist/` finds nothing but error messages.
+
 Want page views and amount-selection counts? Create a free [PostHog](https://posthog.com) account (1M events/month free), then:
-1. Add the `analytics` block in `chai.config.ts` (see CONFIG.md).
-2. Add your key: repo **Settings → Secrets and variables → Actions → Variables** → `VITE_POSTHOG_KEY` (Pages), or Vercel env var.
+1. Uncomment the `analytics` block in `chai.config.ts` (see CONFIG.md).
+2. Add your key: repo **Settings → Secrets and variables → Actions → Variables** → `VITE_POSTHOG_KEY` (Pages), or Vercel env var. It's the **project** key, the one starting `phc_` — public by design; it can only write events.
 3. **Get the ready-made dashboard** — one command creates the full "Chai Analytics ☕" dashboard (visitors, intent funnel, popular amounts, pay-method breakdown) in your PostHog project:
    ```bash
    POSTHOG_PERSONAL_API_KEY=phx_... POSTHOG_PROJECT_ID=12345 node scripts/posthog-dashboard.mjs
@@ -69,6 +76,8 @@ Want page views and amount-selection counts? Create a free [PostHog](https://pos
    real events first, or there is nothing for the charts to verify against.
 
    Details, the manual alternative, and what every chart honestly means: [ANALYTICS.md](./ANALYTICS.md).
+
+Your donors are not the product, so the page turns off everything PostHog does by default that would watch them: no autocapture, no session recording, no heatmaps, no surveys. Three events, fixed properties, and a filter that drops anything else before it leaves the browser ([details](./ANALYTICS.md)). Your donors' messages never leave their UPI app's payment note.
 
 Heads-up on what analytics *means* here: you'll see views, chosen amounts, and pay-button clicks — **not completed payments**. UPI P2P has no confirmation callback; a "₹500 pay click" is interest, not income. That missing callback is also exactly why nobody (including us) can charge you a commission.
 
@@ -82,7 +91,9 @@ Heads-up on what analytics *means* here: you'll see views, chosen amounts, and p
 |---|---|
 | Build failed on push | Open the Actions log — config errors list the exact field. Usually the VPA or a too-long note. |
 | "Refusing to deploy: chai.config.ts still has the example values" | Working as intended — you haven't replaced `creator.vpa` / `creator.name` yet. Do Step 2, commit, push. To preview the page before you have a UPI ID to hand, set `CHAI_ALLOW_PLACEHOLDER=1`. |
-| Page is blank on Pages but fine on Vercel | You edited `vite.config.ts` `base` — revert; the workflow sets it automatically. |
+| Page is blank on Pages but fine on Vercel | You edited `vite.config.ts` `base` — revert; the workflow sets it automatically from your repo name. |
+| Page is blank on a **custom domain** | Missing step 3 of the custom-domain setup: set the `CHAI_BASE_PATH` repository variable to `/`, then re-run the deploy. |
+| Deployed, but PostHog shows nothing | The key is a build-time value, so it only applies to builds made *after* you added it — push a commit (or re-run the workflow) once `VITE_POSTHOG_KEY` is set. Check it starts with `phc_`. |
 | "Pay with UPI app" does nothing on my phone | Known GPay/PhonePe limitation for browser payments to personal UPI IDs — not a bug in your page. Donors see the Copy-UPI-ID and QR fallbacks automatically. |
 | QR scans but amount is editable/absent in some app | Some apps treat P2P QR amounts as suggestions. Donor can type it; the note still carries through. |
 
