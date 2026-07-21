@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readChaiConfigRaw } from '../../scripts/read-config.mts';
+import { declaresAnalytics } from '../config/load.ts';
 import type { ChaiAnalytics } from '../config/schema.ts';
 import { selectAdapter, track } from './index.ts';
 import type { EventSink } from './types.ts';
@@ -68,7 +70,24 @@ describe('the build-time flag', () => {
     expect(typeof __CHAI_ANALYTICS__).toBe('boolean');
   });
 
-  it('is false for the shipped example config, which declares no analytics block', () => {
-    expect(__CHAI_ANALYTICS__).toBe(false);
+  /**
+   * Asserts the *relationship* the gate promises — the flag tracks whether the config
+   * declares an `analytics` block — rather than the example's particular value. That
+   * keeps it true in a creator's repo, where enabling PostHog flips both sides
+   * together, while still failing if the `define` in vite.config.ts stops matching
+   * `declaresAnalytics` (ADR-028). The hardcoded `false` this replaces failed for
+   * every creator who turned analytics on, and blocked the update path (ADR-037).
+   */
+  it('tracks whether the config declares an analytics block', () => {
+    expect(__CHAI_ANALYTICS__).toBe(declaresAnalytics(readChaiConfigRaw()));
   });
+
+  // Canonical only (ADR-037): the shipped example must declare no analytics, so a
+  // fresh fork ships zero PostHog bytes by default.
+  it.skipIf(process.env.CHAI_CANONICAL !== '1')(
+    'is false for the shipped example config, which declares no analytics block',
+    () => {
+      expect(__CHAI_ANALYTICS__).toBe(false);
+    },
+  );
 });
