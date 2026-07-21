@@ -14,12 +14,12 @@ the repo's `.nvmrc`), then `pnpm install && pnpm dev`.
 ## Step 1 — Get the code
 Click **Use this template → Create a new repository** on [`shivams136/buy-me-a-chai`](https://github.com/shivams136/buy-me-a-chai). Name it anything (`buy-me-a-chai` keeps URLs clean). Public or private both work — Pages on private repos needs GitHub Pro, so public recommended.
 
-## Step 2 — Edit `chai.config.ts`
-Open the file in GitHub's web editor (press `.` in your repo for the browser VS Code). Replace the placeholders:
+## Step 2 — Edit `chai.config.yaml`
+Open the file in GitHub's web editor (press `.` in your repo for the browser VS Code). It's a plain YAML file, and your editor will autocomplete field names and show a description as you type each one — that help comes from `chai.schema.json`, which is already wired up. Replace the placeholders:
 
 - `creator.vpa` — **your UPI ID.** Copy-paste it from your UPI app; don't type it. This is where money goes. The build rejects malformed IDs but cannot know if a valid-looking ID is *yours* — that's what Step 5 is for.
 - `creator.name`, `tagline`, `bio` — who you are, why chai.
-- `works` — link your projects (or delete the array to hide the section).
+- `works` — link your projects (or delete the list to hide the section).
 - `chai.basePrice` — price of one chai in ₹ (₹50 is a good default).
 - Drop your photo at `public/avatar.png` (square, ≥ 256px) or remove the `avatar` line for an initials avatar.
 
@@ -56,6 +56,18 @@ A typo'd-but-valid UPI ID sends every future donation to a stranger, unrecoverab
 
 Green? You're live. Share the link. ☕
 
+## Keeping up with the template (optional)
+The template gets improvements — new payment-app fixes, features, dependency bumps. Most creators never need them: a static page that works doesn't rot. But when you *do* want them, you never touch a terminal.
+
+1. Your repo → **Actions** tab → **Update from template** (left sidebar) → **Run workflow**.
+2. It merges the latest template, **keeps your `chai.config.yaml` and `public/` exactly as they are**, checks the result still builds, and opens a **pull request**.
+3. Review the diff, and **Merge** — your page redeploys automatically.
+
+Two things to know:
+- It only ever changes template code, never your config or your assets — your UPI ID is safe.
+- If the template changed its own GitHub Actions files, the PR **can't** include those (GitHub blocks automated edits to workflows); the PR lists them so you can copy them across by hand if you want.
+- If you've edited component source yourself (say, to remove the footer links), those files get the template's version back. That path is for creators who only edit config; if you're editing code, you'll want to resolve those merges yourself.
+
 ## Adding the link to your stuff
 - GitHub profile README / repo READMEs: `[☕ Buy me a chai](https://your-page-url)`
 - A badge: `![](https://img.shields.io/badge/☕-buy_me_a_chai-C4622D)` linked to your page
@@ -65,7 +77,7 @@ Green? You're live. Share the link. ☕
 Analytics is **off by default**, and off here means absent: with no `analytics` block your page contains no tracking code at all, makes no requests, and sets nothing in the browser. You can verify that yourself — `pnpm build && grep -rl posthog dist/` finds nothing but error messages.
 
 Want page views and amount-selection counts? Create a free [PostHog](https://posthog.com) account (1M events/month free), then:
-1. Uncomment the `analytics` block in `chai.config.ts` (see CONFIG.md).
+1. Uncomment the `analytics` block in `chai.config.yaml` (see CONFIG.md). You do **not** put the key in the file — it's injected from the environment variable below.
 2. Add your key: repo **Settings → Secrets and variables → Actions → Variables** → `VITE_POSTHOG_KEY` (Pages), or Vercel env var. It's the **project** key, the one starting `phc_` — public by design; it can only write events.
 3. **Get the ready-made dashboard** — one command creates the full "Chai Analytics ☕" dashboard (visitors, intent funnel, popular amounts, pay-method breakdown) in your PostHog project:
    ```bash
@@ -90,7 +102,7 @@ Heads-up on what analytics *means* here: you'll see views, chosen amounts, and p
 | Symptom | Fix |
 |---|---|
 | Build failed on push | Open the Actions log — config errors list the exact field. Usually the VPA or a too-long note. |
-| "Refusing to deploy: chai.config.ts still has the example values" | Working as intended — you haven't replaced `creator.vpa` / `creator.name` yet. Do Step 2, commit, push. To preview the page before you have a UPI ID to hand, set `CHAI_ALLOW_PLACEHOLDER=1`. |
+| "Refusing to deploy: chai.config.yaml still has the example values" | Working as intended — you haven't replaced `creator.vpa` / `creator.name` yet. Do Step 2, commit, push. To preview the page before you have a UPI ID to hand, set `CHAI_ALLOW_PLACEHOLDER=1`. |
 | Page is blank on Pages but fine on Vercel | You edited `vite.config.ts` `base` — revert; the workflow sets it automatically from your repo name. |
 | Page is blank on a **custom domain** | Missing step 3 of the custom-domain setup: set the `CHAI_BASE_PATH` repository variable to `/`, then re-run the deploy. |
 | Deployed, but PostHog shows nothing | The key is a build-time value, so it only applies to builds made *after* you added it — push a commit (or re-run the workflow) once `VITE_POSTHOG_KEY` is set. Check it starts with `phc_`. |

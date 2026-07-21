@@ -4,7 +4,7 @@ Instructions for Claude Code when working in this repository. Read this fully be
 
 ## What this project is
 
-A **zero-commission, self-hosted UPI donation page** for Indian creators. Creators fork/template this repo, edit `chai.config.ts`, and deploy to GitHub Pages or Vercel for free. Donors pay via UPI P2P (QR scan / copy VPA / `upi://` deeplink) directly to the creator's UPI ID. **There is no backend, no database, no accounts, and no payment processing anywhere in this project — by design, forever.**
+A **zero-commission, self-hosted UPI donation page** for Indian creators. Creators fork/template this repo, edit `chai.config.yaml`, and deploy to GitHub Pages or Vercel for free. Donors pay via UPI P2P (QR scan / copy VPA / `upi://` deeplink) directly to the creator's UPI ID. **There is no backend, no database, no accounts, and no payment processing anywhere in this project — by design, forever.**
 
 Owner: `shivams136`. Canonical repo: `github.com/shivams136/buy-me-a-chai`.
 
@@ -15,7 +15,7 @@ Owner: `shivams136`. Canonical repo: `github.com/shivams136/buy-me-a-chai`.
 | `docs/PRD.md` | Requirements, scope, priorities. **Check scope here before adding features.** |
 | `docs/DESIGN.md` | UI/UX spec: layout, flows, states, copy guidelines |
 | `docs/ARCHITECTURE.md` | Tech stack, project structure, build/deploy pipeline |
-| `docs/CONFIG.md` | The `chai.config.ts` schema — the public API of this project |
+| `docs/CONFIG.md` | The `chai.config.yaml` schema — the public API of this project |
 | `docs/ANALYTICS.md` | Event contract (3 events, fixed properties) + PostHog dashboard spec + `scripts/posthog-dashboard.mjs` |
 | `docs/DECISIONS.md` | ADRs. **Do not re-litigate decided items; add a new ADR to change one.** |
 | `docs/ROADMAP.md` | Phases v0/v1/v2 |
@@ -28,7 +28,7 @@ Owner: `shivams136`. Canonical repo: `github.com/shivams136/buy-me-a-chai`.
 3. **Never hide the QR or Copy-UPI-ID fallbacks behind the deeplink.** Deeplinks fail silently on GPay/PhonePe for P2P VPAs. All three payment paths stay visible on mobile.
 4. **Never make network calls when analytics is disabled.** Grep for `fetch(`/`navigator.sendBeacon` after touching analytics code; the no-op adapter must be truly inert.
 5. **Never collect, store, or transmit donor PII.** The donor message goes into the UPI `tn` param only.
-6. **Config is the only customization API.** No feature should require creators to edit component source. If it needs customization, it goes in `chai.config.ts` schema + `docs/CONFIG.md`.
+6. **Config is the only customization API.** No feature should require creators to edit component source. If it needs customization, it goes in the `chai.config.yaml` schema (`src/config/schema.ts`) + `docs/CONFIG.md`. The schema is validated at build time by the `chai-config` Vite plugin and served to the browser as a plain object via `virtual:chai-config`, so Zod never ships (ADR-030). Regenerate `chai.schema.json` with `pnpm gen:schema` after any schema change — CI fails if it drifts.
 7. **All builds must work on a GitHub Pages subpath** (`/buy-me-a-chai/`). Never hardcode absolute paths; use Vite `base`.
 
 ## UPI domain knowledge (do not "fix" these)
@@ -53,7 +53,7 @@ Owner: `shivams136`. Canonical repo: `github.com/shivams136/buy-me-a-chai`.
 
 ## Conventions
 
-- TypeScript strict; no `any`; no default exports except `chai.config.ts` and route components.
+- TypeScript strict; no `any`; no default exports except route components (and the `virtual:chai-config` declaration).
 - Components in `src/components/`, one component per file, PascalCase. Hooks in `src/hooks/`, `use*` camelCase.
 - All user-visible strings in `src/strings.ts` (prepares for i18n; don't build i18n yet).
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`). Small, reviewable commits.

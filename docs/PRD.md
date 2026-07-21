@@ -55,7 +55,7 @@ The cost of not solving it: creators either lose a cut of small donations (where
 
 | # | Requirement | Acceptance criteria |
 |---|---|---|
-| P0.1 | Typed config (`chai.config.ts`) drives the entire page | Zod-validated at build; build fails with a readable error on invalid VPA format, missing name, or non-positive base price |
+| P0.1 | Config file (`chai.config.yaml`) drives the entire page | Zod-validated at build; build fails with a readable error on invalid VPA format, missing name, or non-positive base price |
 | P0.2 | Creator profile section | Renders name, avatar, bio (markdown subset), social links, works/projects list from config |
 | P0.3 | Chai amount selector | Preset chips (e.g. 1/3/5 chai × base price) + custom amount input; amount ≥ ₹1; ₹1,00,000 soft cap with warning copy |
 | P0.4 | Donor message field | Optional; sanitized; max 60 chars (UPI `tn` limits); default note from config used when empty |

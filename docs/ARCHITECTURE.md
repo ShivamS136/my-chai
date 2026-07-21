@@ -7,7 +7,7 @@
 | Build | Vite 8 | Fast, first-class static output, `base` option handles Pages subpath. Vite 8 is forced by `@vitejs/plugin-react@6`'s `vite: ^8` peer (ADR-014) |
 | UI | React 18 + TypeScript (strict) | Owner's home turf; v1 widget will NOT use React (see ADR-004) |
 | Styling | Tailwind CSS v4 + CSS custom properties for theme tokens | Tokens make widget theming portable |
-| Validation | Zod v4 (`z.strictObject`) | Config schema = runtime validation + inferred TS types, one source of truth |
+| Config | `chai.config.yaml` + `yaml` parser (build-only dep), validated by Zod v4 (`z.strictObject`) at build, served via `virtual:chai-config` | YAML keeps creator + template in separate files (conflict-free updates); build-time validation keeps Zod and the parser out of the browser (ADR-030). `chai.schema.json` (`z.toJSONSchema`) gives editor autocomplete |
 | QR | `qrcode` as an **encoder only**; we render the SVG and PNG ourselves (ADR-017) | No server, no canvas, regenerates per keystroke — and the downloaded bytes are decodable in CI |
 | Icons | Lucide for UI glyphs + `simple-icons` (CC0) for social brand marks | Lucide dropped brand icons in v1; both are inlined path data, no icon CDN (ADR-023) |
 | Tests | Vitest + @testing-library/react + `jsqr` (decode QRs in tests) | URI builder & QR round-trip provable in CI |
@@ -26,19 +26,23 @@ buy-me-a-chai/
 ├── README.md
 ├── CONTRIBUTING.md
 ├── LICENSE                    # MIT
-├── chai.config.ts             # ← the creator's file (example ships pre-filled)
+├── chai.config.yaml          # ← the creator's file (YAML, values only; example ships pre-filled)
+├── chai.schema.json          # generated from the Zod schema — the creator's editor autocomplete (ADR-030)
 ├── index.html
-├── vite.config.ts             # base: env BASE_PATH || '/'; chai-config-validator + chai-analytics-flag + chai-noscript + chai-head plugins
+├── vite.config.ts             # base: env BASE_PATH || '/'; chai-config (virtual module + analytics flag + HMR) + chai-config-validator + chai-noscript + chai-head plugins
 ├── biome.jsonc                # lint + format
 ├── tsconfig.json              # solution: references app / node / scripts projects
 ├── .nvmrc  .node-version      # Node 24
 ├── package.json
 ├── docs/                      # PRD, DESIGN, ARCHITECTURE, CONFIG, DECISIONS, ROADMAP, SETUP, COMPAT
 ├── .github/workflows/
-│   ├── ci.yml                 # PR: lint, typecheck, test+coverage, build, no-analytics-bytes grep, subpath build, guard negative test
-│   └── deploy-pages.yml       # main: build:deploy with BASE_PATH from the repo name → Pages (ADR-029)
+│   ├── ci.yml                 # PR: lint, typecheck, schema-drift, test+coverage, build, no-analytics-bytes grep, subpath build, guard negative test
+│   ├── deploy-pages.yml       # main: build:deploy with BASE_PATH from the repo name → Pages (ADR-029)
+│   └── update-template.yml    # button: merge template updates into a PR, keeping the creator's config (ADR-031)
 ├── scripts/
-│   ├── check-config.mts       # CI step: Zod-validate chai.config.ts, exit 1 on failure
+│   ├── read-config.mts        # the only node:fs/YAML read of chai.config.yaml; memoised (ADR-030)
+│   ├── gen-schema.mts         # writes chai.schema.json from Zod; --check is the CI drift guard
+│   ├── check-config.mts       # CI step: Zod-validate chai.config.yaml, exit 1 on failure
 │   ├── check-placeholder.mjs  # deploy gate: refuse to ship the unedited example (ADR-013)
 │   └── placeholder-detect.mjs # pure detection logic, unit-tested
 ├── public/                    # avatar, favicon, og-image
@@ -47,14 +51,14 @@ buy-me-a-chai/
     ├── App.tsx
     ├── index.css              # @import "tailwindcss" + @theme tokens
     ├── strings.ts             # all user-visible copy
-    ├── project.ts             # MAKER + MAKER_PROJECT constants — origin branding, not config (ADR-027)
+    ├── chai-env.d.ts          # ambient: __CHAI_ANALYTICS__ flag + virtual:chai-config module
     ├── config/
-    │   ├── schema.ts          # Zod schema + defineConfig() + inferred types
+    │   ├── schema.ts          # Zod schema (.describe() feeds the JSON Schema) + inferred types
     │   ├── css-color.ts       # dependency-free CSS colour parse + WCAG contrast
     │   ├── warnings.ts        # WARN-only rules (contrast, CSP, note safety)
-    │   ├── load.ts            # pure: parseConfig + CONFIG.md error formatting
-    │   └── config.ts          # the app's singleton (throws at import on bad config)
-    ├── lib/                   # framework-free core, except the DOM-touching four below
+    │   ├── load.ts            # pure: parseConfig + declaresAnalytics + CONFIG.md error formatting
+    │   └── config.ts          # the app's singleton — re-exports virtual:chai-config (ADR-030)
+    ├── lib/                   # framework-free core, except the DOM-touching ones below
     │   ├── upi.ts             # buildUpiUri(), validateVpa(), formatAmount()
     │   ├── qr.ts              # matrix + SVG + PNG encoders, no canvas (ADR-017)
     │   ├── amount.ts          # donor input parsing, ₹ formatting (en-IN grouping)
@@ -64,7 +68,7 @@ buy-me-a-chai/
     │   ├── download.ts        # data: URI → file download (DOM)
     │   ├── device.ts          # isMobileDevice() single pointer heuristic (DOM, ADR-019)
     │   ├── clipboard.ts       # copyText(): async Clipboard API + execCommand fallback (DOM)
-    │   ├── referral.ts        # branding-link utm/ref tags + inbound source read (ADR-027)
+    │   ├── referral.ts        # branding-link utm/ref tags (campaign injected) + inbound source read (ADR-027)
     │   └── theme.ts           # accent derivation + data-theme apply (DOM, ADR-021)
     ├── analytics/
     │   ├── types.ts           # the ChaiEvent union — the contract ANALYTICS.md documents
@@ -92,7 +96,7 @@ v1 restructures to pnpm workspaces: `packages/page`, `packages/widget` (Lit web 
 ## Key flows
 
 ### Config → page
-`chai.config.ts` (creator-edited, gitignored? **No** — committed; it's the point of the fork) → parsed with Zod → an invalid config fails the build with a formatted error listing each bad field. Enforcement is the `chai-config-validator` plugin in `vite.config.ts`, **not** an import in app code: a bundler only bundles modules, it never executes them, so a module-scope throw would not fail `vite build` (ADR-016). `src/config/config.ts` additionally throws at module load so `pnpm dev` shows the same block in Vite's overlay. CI runs both the build and a dedicated `pnpm check:config` step. A second plugin, `chai-noscript`, reads the same parsed config and bakes the creator's real VPA into the `<noscript>` block of `index.html`, so a JS-disabled donor still gets a UPI ID to copy (ADR-020). A third, `chai-head`, injects the document title, description, `<html lang>`, OG/Twitter cards and a forced `data-theme` from `meta`/`theme` — head tags that must be in the *served* HTML because social crawlers never run the bundle (ADR-022).
+`chai.config.yaml` (creator-edited, gitignored? **No** — committed; it's the point of the fork) → read once by `scripts/read-config.mts` (`node:fs` + YAML) → validated with Zod in `src/config/load.ts` → served to the browser as a plain object via the `virtual:chai-config` module (ADR-030). The validation and the parse both happen in Node at build time, so **neither Zod nor a YAML parser ships in the browser bundle** — it dropped ~70 kB. `src/config/config.ts` is a thin re-export of the virtual module; a bad config throws in the plugin's `load` hook, which surfaces as Vite's dev overlay and, in build, via the `chai-config-validator` plugin's formatted per-field report (a separate `apply:'build'` plugin, since a serve-mode throw would abort Vitest — ADR-016). CI runs the build, a dedicated `pnpm check:config` step, and `pnpm check:schema` (which fails if `chai.schema.json` has drifted from the Zod schema). Two more plugins read the same memoised YAML: `chai-noscript` bakes the creator's real VPA into the `<noscript>` block of `index.html` so a JS-disabled donor still gets a UPI ID to copy (ADR-020); `chai-head` injects the document title, description, `<html lang>`, OG/Twitter cards and a forced `data-theme` — head tags that must be in the *served* HTML because social crawlers never run the bundle (ADR-022). The analytics API key is injected into the config from `VITE_POSTHOG_KEY` by the `chai-config` plugin at build time, not written in the YAML.
 
 ### Amount → payable intent
 ```

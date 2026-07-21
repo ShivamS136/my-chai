@@ -45,7 +45,7 @@ project does not turn it on for you. Ask if you want it wired to a config flag.
 
 ### Disabled means absent, not idle
 
-With no `analytics` block in `chai.config.ts` — the default — `dist/` contains no PostHog
+With no `analytics` block in `chai.config.yaml` — the default — `dist/` contains no PostHog
 code at all, not merely unreached code (ADR-028). You can check your own build:
 
 ```bash
@@ -119,7 +119,7 @@ setup, since this moves faster than this file does.
 
 **2. Point it at the right project.** If you have several, say which one — the server has an
 active-project notion and will otherwise use whichever it defaults to. Ask it to list your
-projects and pick the one whose capture key is in your `chai.config.ts`.
+projects and pick the one whose capture key you set as `VITE_POSTHOG_KEY` for the page.
 
 **3. Ask for the dashboard.** Paste the tile table from this document into your prompt so the
 agent builds the exact contract rather than improvising:
@@ -154,7 +154,7 @@ PostHog's Templates tab ships only templates accepted by the PostHog team, and t
 
 ## Verifying events locally
 
-Uncomment the `analytics` block in `chai.config.ts`, then:
+Uncomment the `analytics` block in `chai.config.yaml`, then:
 
 ```bash
 VITE_POSTHOG_KEY=phc_your_test_key pnpm dev

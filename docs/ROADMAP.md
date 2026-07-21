@@ -20,8 +20,8 @@ Each session ends green: `pnpm typecheck && pnpm test && pnpm build`. Restate co
 
 ### Session 1 — Scaffolding only (no UI)
 - Vite + React 18 + TS strict + Tailwind v4 + Vitest + pnpm; MIT license; `.github/workflows/ci.yml`.
-- `src/config/schema.ts` (full Zod schema per CONFIG.md, `.strict()`, `defineConfig`) + `load.ts` with formatted error output.
-- Example `chai.config.ts` with placeholder creator (`example@upi` must fail? No — use a **valid-format** placeholder `yourname@bank` that fails a dedicated "placeholder not replaced" check, so fresh forks can't accidentally ship the example).
+- `src/config/schema.ts` (full Zod schema per CONFIG.md, `.strict()`) + `load.ts` with formatted error output. (Config was authored in TS via `defineConfig` through v0; Session 6 moved it to `chai.config.yaml` — ADR-030.)
+- Example config with placeholder creator (`example@upi` must fail? No — use a **valid-format** placeholder `yourname@bank` that fails a dedicated "placeholder not replaced" check, so fresh forks can't accidentally ship the example).
 - `src/lib/upi.ts` (`buildUpiUri`, `validateVpa`, amount/note rules) with table-driven tests, 100% branch.
 - `src/strings.ts` stub. **Deliverable:** CI green on an empty white page.
 
