@@ -175,7 +175,7 @@
           "description": "Leave this out — the key is injected at build from the VITE_POSTHOG_KEY environment variable, never written here."
         },
         "host": {
-          "description": "Your PostHog ingestion host. Default is US cloud; use the EU host if you signed up there.",
+          "description": "Your PostHog ingestion host. Default is EU cloud; use the US host if you signed up there.",
           "type": "string"
         }
       },
@@ -199,7 +199,7 @@
           "type": "string"
         },
         "ogImage": {
-          "description": "Social-share image. Use an absolute https:// URL for reliable crawler previews.",
+          "description": "The picture shown when your link is shared. Defaults to /og.png — replace public/og.png to use your own, 1200x630.",
           "type": "string"
         },
         "language": {

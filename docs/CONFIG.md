@@ -57,13 +57,14 @@ theme:
 meta:
   title: Buy Shivam a chai            # optional, defaults to `Buy {name} a chai`
   description: Support my open-source work — 0% commission, direct UPI.
-  ogImage: /og.png                    # optional; use an absolute https:// URL for reliable
-                                      # social cards (crawlers need one)
+                                      # optional; the default names you instead
+  ogImage: /og.png                    # the shared-link picture. Replace public/og.png
+                                      # with your own 1200x630 to change it
   language: en                        # reserved for future i18n
 
 # analytics:                          # optional — omit entirely to disable (the default).
 #   provider: posthog                 # The API key is NOT written here: it is injected at build
-#   host: https://us.i.posthog.com    # from the VITE_POSTHOG_KEY environment variable (ADR-030).
+#   host: https://eu.i.posthog.com    # from the VITE_POSTHOG_KEY environment variable (ADR-030).
 
 # branding:                           # optional — the template's own two links. Defaults to the
 #   maker:                            # template author's, and updates to theirs on a template pull.
@@ -88,6 +89,7 @@ meta:
 | `theme.mode` | `light` \| `dark` \| `auto` (default). `light`/`dark` pin the palette via `data-theme`; the accent is derived into contrast-safe `-strong`/`-soft` tokens per surface (ADR-021) | Build fails on any other value |
 | core palette (bg / surface / ink) | Brand-locked — not configurable. Only `theme.accent` recolours the page, and never the canvas (ADR-025) | n/a (no such key) |
 | `analytics.apiKey` | Never written in the config — injected at build from `VITE_POSTHOG_KEY` (ADR-030). Empty/unset while a provider is set | Warn + analytics silently disabled (fork-safety) |
+| `analytics.host` | Your PostHog **ingestion** host — `https://eu.i.posthog.com` (default) or `https://us.i.posthog.com`. Must be `https://`. Must match the region your PostHog project lives in: a key sent to the wrong region is accepted with `200 OK` and then discarded, so a mismatch looks exactly like a working page with an empty dashboard (ADR-039) | Build fails on `http://` or a malformed URL. A **wrong region cannot be detected** — nothing warns |
 | `analytics` block absent (the default) | — | No adapter, no requests, and **no PostHog code in the build at all** — the chunk is tree-shaken out (ADR-028) |
 | `branding` | Optional; every field defaults to the maker's value (ADR-032). Overriding rebrands that link. Unknown sub-keys rejected | Build fails on a bad URL or unknown key |
 | Unknown top-level keys | `.strict()` (spelled `z.strictObject` in Zod v4) | Build fails, with a did-you-mean suggestion (catches typos like `cretor`) |
@@ -128,6 +130,7 @@ editor). See ADR-016, ADR-030.
 - **Presence of the `analytics` block is a build-time signal, not just a runtime one:** it is read straight off the raw YAML to decide whether the PostHog chunk is emitted at all. That is why commenting the block out is meaningfully different from leaving it in place with no key — the first ships nothing, the second ships a chunk that never runs (ADR-028).
 - **`branding` defaults to the maker's (ADR-032):** so a fork inherits the template credit, and a maker changing their support URL propagates to forks on the next update. Overriding is a config edit; removing the links is a source edit, deliberately.
 - **`meta.language` reserved:** schema stability > YAGNI here; adding it later would be a breaking change for i18n adopters.
+- **The social card is one file, the words around it are yours (ADR-040):** `meta.ogImage` points at `/og.png`, so replacing `public/og.png` with your own 1200×630 image changes your link preview with no config edit — and `update-template.yml` restores `public/` verbatim, so your file survives template pulls. The *text* of the card is per-creator and baked into the served HTML at build: `og:title` becomes `Buy {your name} a chai`, `og:site_name` is your name, and `og:description` names you too unless you write your own. The picture cannot be per-creator without a build step that renders images, which this project does not have.
 
 ## Versioning
 

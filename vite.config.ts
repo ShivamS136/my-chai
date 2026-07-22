@@ -1,3 +1,5 @@
+import { closeSync, openSync, readSync } from 'node:fs';
+import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
@@ -230,8 +232,60 @@ function chaiNoscript(): Plugin {
  */
 function chaiHead(): Plugin {
   const base = process.env.BASE_PATH ?? '/';
+
+  // The page's own origin, when the build environment knows it. deploy-pages.yml
+  // passes it straight from the Pages API, so it follows a custom domain and needs
+  // no creator action; other hosts set SITE_URL themselves. Unset (dev, a plain
+  // `pnpm build`) means we stay relative rather than inventing an origin — a wrong
+  // absolute URL is far worse than a relative one, because og:url is how platforms
+  // attribute a share, and a fork inheriting someone else's would misattribute
+  // every one of them.
+  const origin = ((): string | undefined => {
+    const raw = process.env.SITE_URL?.trim();
+    if (raw === undefined || raw === '') return undefined;
+    try {
+      return new URL(raw).origin;
+    } catch {
+      return undefined;
+    }
+  })();
+
   const resolveOg = (path: string): string =>
     /^https?:\/\//i.test(path) ? path : `${base}${path.replace(/^\//, '')}`;
+
+  // Crawlers need an absolute og:image — Meta's own WhatsApp doc says so outright,
+  // and WhatsApp is where these links actually get shared.
+  const absolute = (path: string): string => {
+    const resolved = resolveOg(path);
+    if (origin === undefined || /^https?:\/\//i.test(resolved)) return resolved;
+    try {
+      return new URL(resolved, origin).href;
+    } catch {
+      return resolved;
+    }
+  };
+
+  // Declaring the real pixel size lets a crawler render the card on the first
+  // share instead of fetching it asynchronously and showing nothing. We only ever
+  // claim a size we measured: PNG puts width and height at a fixed offset, so a
+  // local PNG is 12 bytes of header away. Anything else (a JPEG, a remote URL, a
+  // creator's own file we cannot read) simply gets no dimensions.
+  const pngSize = (path: string): readonly [number, number] | undefined => {
+    if (/^https?:\/\//i.test(path) || !path.toLowerCase().endsWith('.png')) return undefined;
+    try {
+      const fd = openSync(resolve('public', path.replace(/^\//, '')), 'r');
+      try {
+        const header = Buffer.alloc(24);
+        if (readSync(fd, header, 0, 24, 0) < 24) return undefined;
+        if (header.toString('ascii', 1, 4) !== 'PNG') return undefined;
+        return [header.readUInt32BE(16), header.readUInt32BE(20)];
+      } finally {
+        closeSync(fd);
+      }
+    } catch {
+      return undefined;
+    }
+  };
 
   return {
     name: 'chai-head',
@@ -243,23 +297,42 @@ function chaiHead(): Plugin {
           const { creator, meta, theme } = config;
 
           const title = escapeHtml(meta.title);
+          // Not the tagline. This is the line a stranger reads in a group chat under
+          // "Buy {name} a chai", so it should answer "what happens if I tap this"
+          // rather than describe the creator — the title already names them, and a
+          // tagline is usually too short to fill a preview. A creator who wants
+          // their own sentence sets `meta.description`.
           const description = escapeHtml(
             meta.description ??
-              creator.tagline ??
-              `Support ${creator.name} — payments go straight to their UPI. 0% commission, no middleman.`,
+              `Support ${creator.name} with a chai. Payments go straight to their UPI ID — 0% commission, no middleman, and nothing to sign up for.`,
           );
           const lang = escapeHtml(meta.language);
           const themeAttr =
             theme.mode === 'light' || theme.mode === 'dark' ? ` data-theme="${theme.mode}"` : '';
           const ogImage =
-            meta.ogImage === undefined ? undefined : escapeHtml(resolveOg(meta.ogImage));
+            meta.ogImage === undefined ? undefined : escapeHtml(absolute(meta.ogImage));
           const twitterCard = ogImage === undefined ? 'summary' : 'summary_large_image';
+          const size = meta.ogImage === undefined ? undefined : pngSize(meta.ogImage);
+          // Trailing slash: `base` always ends in one, and GitHub Pages 301s the
+          // slashless form while platforms cache and dedupe per exact URL.
+          const canonical =
+            origin === undefined ? undefined : escapeHtml(new URL(base, origin).href);
 
           const head = [
             `<meta property="og:type" content="website" />`,
+            `<meta property="og:site_name" content="${escapeHtml(creator.name)}" />`,
             `<meta property="og:title" content="${title}" />`,
             `<meta property="og:description" content="${description}" />`,
+            ...(canonical === undefined
+              ? []
+              : [`<meta property="og:url" content="${canonical}" />`]),
             ...(ogImage === undefined ? [] : [`<meta property="og:image" content="${ogImage}" />`]),
+            ...(size === undefined
+              ? []
+              : [
+                  `<meta property="og:image:width" content="${size[0]}" />`,
+                  `<meta property="og:image:height" content="${size[1]}" />`,
+                ]),
             `<meta name="twitter:card" content="${twitterCard}" />`,
             `<meta name="twitter:title" content="${title}" />`,
             `<meta name="twitter:description" content="${description}" />`,

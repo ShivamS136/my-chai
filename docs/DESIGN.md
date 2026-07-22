@@ -90,6 +90,27 @@ The masthead, grid and footer share a `max-w-[480px] lg:max-w-[1040px]` shell so
 - Never: "donation processed", "transaction successful", "secure payment gateway" (we are not a gateway).
 - Always disclose: "Payments go directly to the creator's UPI. No middleman, no fees."
 
+## The social card (`public/og.png`)
+
+The picture that appears when a page is shared — WhatsApp above all, then X, LinkedIn, Slack. One file serves every clone, so it carries no name, no accent colour and no amounts: **everything personal is text**, baked per-creator into the served HTML by `chaiHead()` (`og:title`, `og:site_name`, `og:description`). Making the picture per-creator would need a build step that renders images, which this project does not have and does not want.
+
+**The wordmark is the message.** The display line is the product name itself — *Buy Me A Chai*, capitalised exactly as `strings.brandName` capitalises it in the masthead, so the card and the page a visitor lands on carry the same wordmark — because next to og:title ("Buy {name} a chai") the brand name literally is the ask. The eyebrow says out loud what the page is for, in the creator's voice, since the creator is the one sharing the link: `SUPPORT MY WORK · STRAIGHT TO UPI`. The subline is the product's honest pitch demoted to a proof point: `Every rupee arrives whole — 0% commission.` "Chai" is set in the accent, the two-colour wordmark of hand-painted tapri signage.
+
+Beside the words sits a drawn cutting-chai glass — bold ink outline, sticker-flat, milky-caramel brew, so it survives 340px. The facet band on its lower half is what makes it a cutting glass and not a generic cup; the ridges taper with the glass and are spaced by *angle* around the cylinder so they crowd toward the edges like a real pressed tumbler. The tea surface is ringed in the accent — the meniscus, the one brand gesture carried over from the first card. The steam is a single continuous line that ties itself into a heart: gratitude rising. (A ₹ in the steam was considered and rejected — rupees evaporating is the exact opposite of "every rupee arrives whole".)
+
+Constraints any redesign must keep:
+
+| Constraint | Why |
+|---|---|
+| Exactly 1200×630, PNG, no alpha | The one size that clears Facebook (≥1200×630), LinkedIn (≥1200×627), X and WhatsApp at once. Previews composite against light or dark chat bubbles, so transparency renders unpredictably. No crawler accepts SVG |
+| Under ~300 KB | WhatsApp's 600 KB cap is the tightest by an order of magnitude |
+| Bottom ~20% free of text | X crops to 2:1 and overlays the post headline across the lower edge |
+| Legible at 340px wide | WhatsApp's render width. Anything under ~40px type at full size is texture, not copy — put nothing load-bearing there |
+| No creator name, no amounts, no accent | One file, every clone. `chai.presets` are creator-configurable, so a price on the card would advertise a tier the page may not offer |
+| No QR, no receipt, no confirmation | Hard rule 2 — and a QR-shaped mark on a payment card invites scanning something that is not a payment |
+
+A creator replaces `public/og.png` with their own 1200×630 file; no config edit, and `update-template.yml` restores `public/` verbatim so it survives template pulls. Source and regeneration steps: `scripts/og-card.html`.
+
 ## v1 widget notes (forward-looking, don't build in v0)
 - The payment card section above becomes `<chai-widget>` — that's why it's a self-contained 480px card with its own tokens.
 - Redirect-button embed inherits accent color; inline embed opens the card in a popover anchored to the button.

@@ -72,28 +72,49 @@ Eight tiles, designed around three creator questions: *is anyone visiting? are t
 
 Tile 3 + 4 together are the debugging view for ADR-006: a funnel that dies between `amount_selected` and `pay_clicked` on mobile usually means the pay zone isn't landing.
 
+## Pick your region once
+
+PostHog runs two clouds, EU and US, and your project lives in exactly one. This project defaults to **EU** everywhere. If you signed up on US cloud, two values change: `analytics.host` in `chai.config.yaml` becomes `https://us.i.posthog.com`, and the dashboard setup below uses `https://us.posthog.com`.
+
+Those are two different hosts and the `.i.` matters. `eu.i.posthog.com` is the **ingestion** host — where your page sends events. `eu.posthog.com` is the **app** host — where the API and your dashboards live.
+
+Get the app host wrong and you get a 401 immediately. Get the ingestion host wrong and **nothing happens**: PostHog answers `200 OK`, your page looks perfectly healthy, the console is clean, and every event is discarded on arrival. Keys are region-siloed and the SDK does no cross-region routing, so there is no symptom to notice and nothing we can detect at build time. It is worth thirty seconds to check which cloud you are on.
+
 ## Setup — pick one path
 
 | Path | Needs | Best when |
 |---|---|---|
-| **A** — one-command script | A personal API key | You want it done in one command, reproducibly, in CI or a fresh clone |
+| **D** — GitHub Actions button | A personal API key, stored as a repo secret | You never want a terminal. Click *Run workflow* and you're done — **the creator default** |
+| **A** — one-command script | A personal API key | You want it reproducible, from CI or a fresh clone |
 | **B** — PostHog MCP | An AI coding agent (Claude Code, Cursor, …) | You already work in an agent and would rather ask for the dashboard in English — and tweak it conversationally afterwards |
 | **C** — manual | Nothing | You want to see how each insight is built, or you don't want any key/agent involved |
 
-All three produce the same eight tiles. A and B both hit the same PostHog API.
+All four produce the same eight tiles. A, B and D hit the same PostHog API.
 
-### Path A: one-command script (recommended)
+### Path D: the GitHub Actions button (no terminal)
+
+Your repo ships a **Set up PostHog dashboard** workflow. Actions tab → pick it → **Run workflow**, check the region, done. The run summary links straight to the finished dashboard.
+
+EU is preselected. If you signed up on US cloud, switch the dropdown — a wrong region here fails loudly with a 401, so you will know.
+
+**One-time:** add your personal API key as a repository **secret** named `POSTHOG_PERSONAL_API_KEY` (Settings → Secrets and variables → Actions → **Secrets**), scoped to `dashboard:write` + `insight:write`.
+
+It has to be a *secret* — not a variable, which anyone who can see the repo can read, and not a workflow input, since inputs are echoed into the run UI and logs. That is how keys leak. Optionally set a `POSTHOG_PROJECT_ID` repository **variable** so later runs need nothing typed at all.
+
+Same script and same idempotency as Path A: re-running updates the dashboard instead of duplicating it. The job takes `contents: read` and nothing else — it never writes to your repo. Self-hosted PostHog isn't in the region dropdown; use Path A for that.
+
+### Path A: one-command script (terminal / CI)
 
 ```bash
 POSTHOG_PERSONAL_API_KEY=phx_...  \
 POSTHOG_PROJECT_ID=12345          \
-POSTHOG_HOST=https://us.posthog.com \
+POSTHOG_HOST=https://eu.posthog.com \
 node scripts/posthog-dashboard.mjs
 ```
 
 - **Key type matters:** this needs a *personal API key* (PostHog → Settings → Personal API keys) with `dashboard:write` + `insight:write` scopes — **not** the project key (`phc_...`) used by the page for capturing. Create the key, run the script once, then delete the key if you like; the dashboard persists.
 - Project ID: PostHog → Settings → Project → "Project ID", or `GET /api/projects/`.
-- Host: `https://us.posthog.com` or `https://eu.posthog.com` (match where you signed up), or your self-hosted URL. Note the *app* host for the API may differ from the ingestion host in your page config (`us.i.posthog.com`) — the script validates and hints.
+- Host: `https://eu.posthog.com` (the default) or `https://us.posthog.com` — match where you signed up — or your self-hosted URL. This is the **app** host, which is not the ingestion host your page config uses (`eu.i.posthog.com`, note the `.i.`). Mixing them up is the most common way this script fails, so it checks and tells you.
 - **Idempotent:** the script tags the dashboard `buy-me-a-chai`; re-running finds it and updates insights instead of duplicating.
 - The script prints the dashboard URL on success. It never touches your page config or capture key.
 

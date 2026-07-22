@@ -8,7 +8,7 @@ import type { EventSink } from './types.ts';
 const settings = (overrides: Partial<ChaiAnalytics> = {}): ChaiAnalytics => ({
   provider: 'posthog',
   apiKey: 'phc_test',
-  host: 'https://us.i.posthog.com',
+  host: 'https://eu.i.posthog.com',
   ...overrides,
 });
 

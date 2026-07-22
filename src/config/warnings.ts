@@ -117,9 +117,12 @@ export function collectWarnings(config: ChaiConfig): ChaiWarning[] {
   }
 
   // ── remote assets vs the page CSP ──────────────────────────────────────────
+  // `meta.ogImage` is deliberately absent: it is never a page subresource. Social
+  // crawlers fetch it server-side, so it leaks no visitor IP and no CSP applies —
+  // warning about a remote one would contradict the field's own advice to prefer an
+  // absolute URL.
   const remoteAssets: ReadonlyArray<readonly [string, string | undefined]> = [
     ['creator.avatar', config.creator.avatar],
-    ['meta.ogImage', config.meta.ogImage],
     ...config.works.map(
       (work, i) => [`works[${i}].image`, work.image] as readonly [string, string | undefined],
     ),

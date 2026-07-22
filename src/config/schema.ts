@@ -522,9 +522,11 @@ const analyticsSchema = z
       })
       .transform((v) => v.replace(/\/+$/, ''))
       .describe(
-        'Your PostHog ingestion host. Default is US cloud; use the EU host if you signed up there.',
+        'Your PostHog ingestion host. Default is EU cloud; use the US host if you signed up there.',
       )
-      .default('https://us.i.posthog.com'),
+      // A key sent to the wrong region is accepted (HTTP 200) and then discarded,
+      // so a mismatch has no symptom at all — see ADR-039. Set this deliberately.
+      .default('https://eu.i.posthog.com'),
   })
   .describe('Optional analytics. Omit this whole block to ship zero tracking code (the default).')
   .optional();
@@ -547,7 +549,9 @@ const metaSchema = z
       .describe('Meta description for search results and social cards.')
       .optional(),
     ogImage: assetPath()
-      .describe('Social-share image. Use an absolute https:// URL for reliable crawler previews.')
+      .describe(
+        'The picture shown when your link is shared. Defaults to /og.png — replace public/og.png to use your own, 1200x630.',
+      )
       .optional(),
     language: z
       .string()

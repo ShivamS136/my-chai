@@ -7,7 +7,7 @@
  *
  * Usage:
  *   POSTHOG_PERSONAL_API_KEY=phx_... POSTHOG_PROJECT_ID=12345 \
- *   POSTHOG_HOST=https://us.posthog.com node scripts/posthog-dashboard.mjs
+ *   POSTHOG_HOST=https://eu.posthog.com node scripts/posthog-dashboard.mjs
  *
  * Requires a PERSONAL API key (phx_...) with dashboard:write + insight:write,
  * NOT the project capture key (phc_...). You may delete the key afterwards.
@@ -23,7 +23,7 @@
 
 const KEY = process.env.POSTHOG_PERSONAL_API_KEY;
 const PROJECT = process.env.POSTHOG_PROJECT_ID;
-const HOST = (process.env.POSTHOG_HOST || 'https://us.posthog.com').replace(/\/$/, '');
+const HOST = (process.env.POSTHOG_HOST || 'https://eu.posthog.com').replace(/\/$/, '');
 const TAG = 'buy-me-a-chai';
 const DASHBOARD_NAME = 'Chai Analytics ☕';
 
@@ -32,7 +32,7 @@ if (!KEY || !PROJECT) {
     'Missing env vars.\n' +
       '  POSTHOG_PERSONAL_API_KEY  (phx_..., Settings → Personal API keys)\n' +
       '  POSTHOG_PROJECT_ID        (Settings → Project)\n' +
-      '  POSTHOG_HOST              (optional, default https://us.posthog.com; use https://eu.posthog.com for EU)'
+      '  POSTHOG_HOST              (optional, default https://eu.posthog.com; use https://us.posthog.com for US)'
   );
   process.exit(1);
 }
@@ -45,7 +45,7 @@ if (KEY.startsWith('phc_')) {
 }
 if (/\.i\.posthog\.com/.test(HOST)) {
   console.error(
-    HOST + ' is an ingestion host. Use the app host instead, e.g. https://us.posthog.com or https://eu.posthog.com'
+    HOST + ' is an ingestion host. Use the app host instead, e.g. https://eu.posthog.com or https://us.posthog.com'
   );
   process.exit(1);
 }
