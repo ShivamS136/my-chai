@@ -30,10 +30,12 @@ on:
         description: Which PostHog cloud you signed up on
         required: true
         type: choice
-        default: https://us.posthog.com
+        # EU first and preselected. Both stay selectable — GitHub requires a choice
+        # input's `default:` to be one of its `options:`.
+        default: https://eu.posthog.com
         options:
-          - https://us.posthog.com
           - https://eu.posthog.com
+          - https://us.posthog.com
 
 # This job only talks to PostHog. It never writes to the repository, so it takes no
 # write scope at all — checkout is the only reason it touches the repo.

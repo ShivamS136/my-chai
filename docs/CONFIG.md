@@ -63,7 +63,7 @@ meta:
 
 # analytics:                          # optional — omit entirely to disable (the default).
 #   provider: posthog                 # The API key is NOT written here: it is injected at build
-#   host: https://us.i.posthog.com    # from the VITE_POSTHOG_KEY environment variable (ADR-030).
+#   host: https://eu.i.posthog.com    # from the VITE_POSTHOG_KEY environment variable (ADR-030).
 
 # branding:                           # optional — the template's own two links. Defaults to the
 #   maker:                            # template author's, and updates to theirs on a template pull.
@@ -88,6 +88,7 @@ meta:
 | `theme.mode` | `light` \| `dark` \| `auto` (default). `light`/`dark` pin the palette via `data-theme`; the accent is derived into contrast-safe `-strong`/`-soft` tokens per surface (ADR-021) | Build fails on any other value |
 | core palette (bg / surface / ink) | Brand-locked — not configurable. Only `theme.accent` recolours the page, and never the canvas (ADR-025) | n/a (no such key) |
 | `analytics.apiKey` | Never written in the config — injected at build from `VITE_POSTHOG_KEY` (ADR-030). Empty/unset while a provider is set | Warn + analytics silently disabled (fork-safety) |
+| `analytics.host` | Your PostHog **ingestion** host — `https://eu.i.posthog.com` (default) or `https://us.i.posthog.com`. Must be `https://`. Must match the region your PostHog project lives in: a key sent to the wrong region is accepted with `200 OK` and then discarded, so a mismatch looks exactly like a working page with an empty dashboard (ADR-039) | Build fails on `http://` or a malformed URL. A **wrong region cannot be detected** — nothing warns |
 | `analytics` block absent (the default) | — | No adapter, no requests, and **no PostHog code in the build at all** — the chunk is tree-shaken out (ADR-028) |
 | `branding` | Optional; every field defaults to the maker's value (ADR-032). Overriding rebrands that link. Unknown sub-keys rejected | Build fails on a bad URL or unknown key |
 | Unknown top-level keys | `.strict()` (spelled `z.strictObject` in Zod v4) | Build fails, with a did-you-mean suggestion (catches typos like `cretor`) |

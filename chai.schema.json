@@ -175,7 +175,7 @@
           "description": "Leave this out — the key is injected at build from the VITE_POSTHOG_KEY environment variable, never written here."
         },
         "host": {
-          "description": "Your PostHog ingestion host. Default is US cloud; use the EU host if you signed up there.",
+          "description": "Your PostHog ingestion host. Default is EU cloud; use the US host if you signed up there.",
           "type": "string"
         }
       },

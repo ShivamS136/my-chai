@@ -387,7 +387,7 @@ describe('analytics', () => {
       analytics: { provider: 'posthog', apiKey: 'phc_abc123' },
     });
     expect(config.analytics?.apiKey).toBe('phc_abc123');
-    expect(config.analytics?.host).toBe('https://us.i.posthog.com');
+    expect(config.analytics?.host).toBe('https://eu.i.posthog.com');
     // The base config's default accent warns on contrast; nothing should warn
     // about analytics itself when the key is real.
     expect(warnings.filter((w) => w.path.startsWith('analytics'))).toEqual([]);

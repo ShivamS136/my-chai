@@ -76,7 +76,9 @@ meta:
 #
 # analytics:
 #   provider: posthog
-#   host: https://us.i.posthog.com   # optional; default is US cloud
+#   host: https://eu.i.posthog.com   # default; use https://us.i.posthog.com on US cloud.
+#                                    # Get this wrong and PostHog accepts every event and
+#                                    # then throws it away, with no error anywhere (ADR-039).
 
 # Branding is the buy-me-a-chai template's two small links (masthead CTA + footer
 # credit) — the MAKER (who wrote the template) and their PROJECT, as opposed to the

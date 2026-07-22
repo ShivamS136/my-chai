@@ -110,9 +110,9 @@ Analytics is **off unless you turn it on**. With no `analytics` block, your page
 
 Want to see how many people visit and which amounts they pick? Make a free [PostHog](https://posthog.com) account (1M events a month, free), then do these three things — all in your browser:
 
-1. **Turn it on.** In `chai.config.yaml`, uncomment the `analytics` block. Your key does *not* go in this file.
+1. **Turn it on.** In `chai.config.yaml`, uncomment the `analytics` block. Your key does *not* go in this file. The `host` line says EU — if you signed up on PostHog's US cloud, change it to `https://us.i.posthog.com`. Get this wrong and PostHog accepts every event and quietly bins it, with nothing to see anywhere.
 2. **Add your key.** Go to Settings → Secrets and variables → Actions → **Variables** and add `VITE_POSTHOG_KEY`. Use the key that starts with `phc_`; it can only send events, so it is safe to be public. Then push any commit, so the next build picks it up.
-3. **Make the dashboard.** Go to the Actions tab → **Set up PostHog dashboard** → **Run workflow**. It builds a ready-made dashboard — visitors, funnel, popular amounts, pay-method mix — and gives you the link when it finishes.
+3. **Make the dashboard.** Go to the Actions tab → **Set up PostHog dashboard** → **Run workflow**. Check the region is the one you signed up on (EU is preselected), and run it. It builds a ready-made dashboard — visitors, funnel, popular amounts, pay-method mix — and gives you the link when it finishes.
 
 > Step 3 also needs your **personal** key (it starts with `phx_`), saved once as a repo **Secret** called `POSTHOG_PERSONAL_API_KEY`. If it is missing, the workflow tells you where to add it. Click around your live page first, or the charts will be empty.
 
@@ -134,7 +134,7 @@ Would rather use a terminal, an AI agent, or build the charts yourself? Those ar
 | "Refusing to deploy: chai.config.yaml still has the example values" | Working as intended — you haven't replaced `creator.vpa` / `creator.name` yet. Do Step 2, commit, push. To preview the page before you have a UPI ID to hand, set `CHAI_ALLOW_PLACEHOLDER=1`. |
 | Page is blank on Pages but fine on Vercel | You edited `vite.config.ts` `base` — revert; the workflow sets it automatically from your repo name. |
 | Page is blank on a **custom domain** | Missing step 3 of the custom-domain setup: set the `CHAI_BASE_PATH` repository variable to `/`, then re-run the deploy. |
-| Deployed, but PostHog shows nothing | The key is a build-time value, so it only applies to builds made *after* you added it — push a commit (or re-run the workflow) once `VITE_POSTHOG_KEY` is set. Check it starts with `phc_`. |
+| Deployed, but PostHog shows nothing | Three causes, in order. **1.** The key is a build-time value, so it only applies to builds made *after* you added it — push a commit (or re-run the workflow) once `VITE_POSTHOG_KEY` is set. **2.** Check it starts with `phc_`. **3.** Check `analytics.host` matches your region (EU vs US). A key sent to the wrong region gets a `200 OK` and is then discarded — the page looks fine and the dashboard stays empty forever, so this one never announces itself. |
 | "Pay with UPI app" does nothing on my phone | Known GPay/PhonePe limitation for browser payments to personal UPI IDs — not a bug in your page. Donors see the Copy-UPI-ID and QR fallbacks automatically. |
 | QR scans but amount is editable/absent in some app | Some apps treat P2P QR amounts as suggestions. Donor can type it; the note still carries through. |
 
