@@ -3,7 +3,8 @@ name: Update from template
 # Pull the latest buy-me-a-chai template into your fork — without a terminal
 # (ADR-031). Run it from the Actions tab: "Update from template" → Run workflow.
 # It merges the template, keeps YOUR chai.config.yaml and public/ untouched, checks
-# the result builds, and opens a pull request for you to review and merge.
+# the result builds, and opens a pull request for you to review and merge — or, if you
+# tick "Apply straight to main", applies it and redeploys without asking (ADR-041).
 #
 # It never runs on a schedule: GitHub disables scheduled workflows after 60 days of
 # repository inactivity, and a donation page is inactive by design — a cron would
@@ -16,10 +17,19 @@ on:
         description: Template repository to pull from (owner/repo)
         required: false
         default: shivams136/buy-me-a-chai
+      direct:
+        description: Apply straight to main and redeploy, without opening a pull request
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   pull-requests: write
+  # Only for `direct`: a push made with GITHUB_TOKEN cannot start another workflow
+  # run, so the Pages deploy has to be dispatched by hand (ADR-041). Unreachable by
+  # the untrusted verify step, which carries no token at all.
+  actions: write
 
 concurrency:
   group: update-template
@@ -27,7 +37,7 @@ concurrency:
 
 jobs:
   update:
-    name: Merge the template and open a PR
+    name: Merge the template and publish the update
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -161,7 +171,7 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm verify
 
-      - name: Push and open a pull request
+      - name: Publish it — direct to main, or as a pull request
         if: steps.merge.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -171,6 +181,7 @@ jobs:
           SHA: ${{ steps.merge.outputs.sha }}
           WF_CHANGED: ${{ steps.merge.outputs.wf_changed }}
           UPSTREAM: ${{ inputs.upstream }}
+          DIRECT: ${{ inputs.direct }}
         run: |
           set -euo pipefail
           # Push the exact verified commit by SHA (not the local branch ref) via a tokened
@@ -180,8 +191,57 @@ jobs:
           # run may have left it behind (merged, abandoned, or never PR'd) and its
           # history is deliberately disposable. Still a pinned SHA, so what gets
           # published is exactly what the verify step checked.
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
-            "${SHA}:refs/heads/${BRANCH}"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git push --force "$REMOTE" "${SHA}:refs/heads/${BRANCH}"
+
+          # `direct`: apply to the default branch instead of asking for a review
+          # (ADR-041). The branch above is pushed first either way, so a refused
+          # fast-forward or a protected main costs nothing — we fall through to the
+          # pull request with the update already safe on its branch.
+          if [ "${DIRECT:-false}" = "true" ]; then
+            # No --force: main is yours. If it moved since checkout, or a branch rule
+            # says no, the push is refused and the pull request path takes over.
+            if git push "$REMOTE" "${SHA}:refs/heads/${BASE}"; then
+              # A push made with GITHUB_TOKEN cannot start another workflow run, so
+              # `on: push` never sees this one and the page would sit on its old build.
+              # workflow_dispatch is the documented exception to that rule — kick the
+              # deploy explicitly. A repo that publishes some other way (Vercel, a
+              # custom domain pipeline) simply has no such workflow; say so rather
+              # than fail, the code is already applied.
+              DEPLOY="The Pages deploy is running now — your page updates in a minute or two."
+              if git cat-file -e "${SHA}:.github/workflows/deploy-pages.yml" 2>/dev/null; then
+                gh workflow run deploy-pages.yml --ref "$BASE" \
+                  || DEPLOY="Applied, but the deploy could not be started automatically — run **Deploy to GitHub Pages** from the Actions tab."
+              else
+                DEPLOY="This repo has no Pages deploy workflow, so publish it the way you normally do."
+              fi
+              {
+                echo "### Template update applied to \`${BASE}\`"
+                echo ""
+                echo "\`pnpm verify\` passed on the merge, so it went straight to your"
+                echo "default branch — no pull request, because you asked for **direct**."
+                echo ""
+                echo "$DEPLOY"
+                echo ""
+                echo "Your \`chai.config.yaml\` and everything in \`public/\` are untouched."
+                echo "To undo it: revert commit \`${SHA}\` on \`${BASE}\`."
+                # Without a PR body to carry it, this is the only place the stripped
+                # workflow list can appear.
+                if [ -n "$(printf '%s' "$WF_CHANGED" | tr -d '[:space:]')" ]; then
+                  echo ""
+                  echo "⚠️ These workflow files also changed upstream and were **not**"
+                  echo "applied — GitHub blocks automated writes to \`.github/workflows/\`."
+                  echo "Copy them across by hand if you want them:"
+                  echo ""
+                  echo '```'
+                  echo "$WF_CHANGED"
+                  echo '```'
+                fi
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::warning::Could not apply directly to ${BASE} (it moved, or a branch rule blocks it) — opening a pull request instead."
+          fi
 
           # A green run means "the update is ready", NOT "the update is live" — the
           # creator still has to merge. Saying so on every successful run is the whole

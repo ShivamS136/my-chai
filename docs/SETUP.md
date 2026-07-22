@@ -74,6 +74,8 @@ The template gets improvements — new payment-app fixes, features, dependency b
 
 A green tick on the run means the update is *ready*, not that it is live: the update sits on a branch until you merge the pull request. Every run tells you what is left to do in its summary — open **Actions** → the run, and read the box at the top.
 
+**Don't want to review anything?** Tick **Apply straight to main** on the Run workflow form. The update still has to build and pass tests first, but if it does, it goes onto your live page without a pull request and redeploys on its own. Tick it per run — there's no setting that makes it permanent, on purpose. Two things to know before you use it: you won't see the diff, so if you've edited any source file yourself you won't be told it was replaced by the template's version; and if anything blocks the direct push, the run quietly falls back to opening a pull request.
+
 A few things to know:
 - It only ever changes template code, never your config or your assets — your UPI ID is safe.
 - It always uses the same branch, `template-update`, so update branches never pile up — running it again just updates the same pull request. To delete that branch after you merge, tick **Settings → General → Pull Requests → Automatically delete head branches**.
