@@ -3,7 +3,8 @@ name: Update from template
 # Pull the latest buy-me-a-chai template into your fork — without a terminal
 # (ADR-031). Run it from the Actions tab: "Update from template" → Run workflow.
 # It merges the template, keeps YOUR chai.config.yaml and public/ untouched, checks
-# the result builds, and opens a pull request for you to review and merge.
+# the result builds, and opens a pull request for you to review and merge — or, if you
+# tick "Apply straight to main", applies it and redeploys without asking (ADR-041).
 #
 # It never runs on a schedule: GitHub disables scheduled workflows after 60 days of
 # repository inactivity, and a donation page is inactive by design — a cron would
@@ -16,10 +17,19 @@ on:
         description: Template repository to pull from (owner/repo)
         required: false
         default: shivams136/buy-me-a-chai
+      direct:
+        description: Apply straight to main and redeploy, without opening a pull request
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   pull-requests: write
+  # Only for `direct`: a push made with GITHUB_TOKEN cannot start another workflow
+  # run, so the Pages deploy has to be dispatched by hand (ADR-041). Unreachable by
+  # the untrusted verify step, which carries no token at all.
+  actions: write
 
 concurrency:
   group: update-template
@@ -27,9 +37,32 @@ concurrency:
 
 jobs:
   update:
-    name: Merge the template and open a PR
+    name: Merge the template and publish the update
     runs-on: ubuntu-latest
     steps:
+      # Optional (ADR-042). GITHUB_TOKEN may never write under .github/workflows/, so
+      # template releases that change CI are stripped from the update and copied by hand.
+      # A TEMPLATE_PAT with Workflows write lifts that — at the price of a token that
+      # expires into silent failure, which is what this step exists to make loud.
+      #
+      # SECURITY: this runs FIRST, before a single byte of upstream content is on disk,
+      # and the secret appears in exactly two step environments — this one and the final
+      # push. The step that executes merged, upstream-controlled code never sees it.
+      - name: Check your update token, if you set one
+        id: pat
+        if: ${{ secrets.TEMPLATE_PAT != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.TEMPLATE_PAT }}
+        run: |
+          set -uo pipefail
+          if gh api user -q .login >/dev/null 2>&1; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "TEMPLATE_PAT accepted — workflow files will be included in this update."
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::TEMPLATE_PAT is set but GitHub rejected it — expired or revoked. Carrying on without it: workflow files will be listed for you to copy by hand."
+          fi
+
       - uses: actions/checkout@v7
         with:
           # Full history: merging the template needs both sides' commits.
@@ -50,6 +83,8 @@ jobs:
           # a workflow_dispatch input is untrusted text.
           UPSTREAM: ${{ inputs.upstream }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          # The boolean verdict from the step above — never the token itself.
+          PAT_OK: ${{ steps.pat.outputs.ok }}
         run: |
           set -euo pipefail
 
@@ -82,21 +117,47 @@ jobs:
           git checkout HEAD -- chai.config.yaml 2>/dev/null || true
           git checkout HEAD -- public 2>/dev/null || true
 
-          # Drop every template change to workflow files — modified AND newly added: the
-          # automation token is not allowed to push under .github/workflows/. Record which
-          # ones changed so we can flag them (in the PR, or the run summary if there is no PR).
           WF_CHANGED="$(git diff --name-only HEAD upstream/main -- .github/workflows/ || true)"
-          git reset -q -- .github/workflows/ 2>/dev/null || true
-          git clean -fdq .github/workflows/ 2>/dev/null || true
-          git checkout HEAD -- .github/workflows/ 2>/dev/null || true
+
+          if [ "${PAT_OK:-}" = "true" ]; then
+            # A validated TEMPLATE_PAT may write workflow files, so keep them. Emptying
+            # WF_CHANGED silences every "copy these by hand" branch below at once —
+            # there is nothing left to copy when the update carries them itself.
+            WF_CHANGED=""
+          else
+            # Drop every template change to workflow files — modified AND newly added: the
+            # automation token is not allowed to push under .github/workflows/. Keep the list
+            # so we can flag them (in the PR, or the run summary if there is no PR).
+            git reset -q -- .github/workflows/ 2>/dev/null || true
+            git clean -fdq .github/workflows/ 2>/dev/null || true
+            git checkout HEAD -- .github/workflows/ 2>/dev/null || true
+          fi
 
           git add -A
 
-          # Emit the workflow-changed list unconditionally, so it is available whether or
-          # not a PR is opened.
+          # A bare list of filenames makes a creator go hunting through two repos, which is
+          # the opposite of ADR-031's promise. Hand over the template's copy and the right
+          # editor link instead: "new file" for one they do not have yet, "edit" for one
+          # they do — two clicks and a paste, still no terminal.
+          WF_HELP=""
+          if [ -n "$(printf '%s' "$WF_CHANGED" | tr -d '[:space:]')" ]; then
+            while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              if git cat-file -e "HEAD:$f" 2>/dev/null; then
+                LINK="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/edit/${DEFAULT_BRANCH}/$f"
+                VERB="paste over yours"
+              else
+                LINK="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/new/${DEFAULT_BRANCH}?filename=$f"
+                VERB="add it to yours"
+              fi
+              WF_HELP="$WF_HELP- \`$f\` — [the template's version](https://raw.githubusercontent.com/$UPSTREAM/main/$f) · [$VERB]($LINK)"$'\n'
+            done <<< "$WF_CHANGED"
+          fi
+
+          # Emitted unconditionally, so it is available whether or not a PR is opened.
           {
-            echo "wf_changed<<WF_EOF"
-            echo "$WF_CHANGED"
+            echo "wf_help<<WF_EOF"
+            echo "$WF_HELP"
             echo "WF_EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -111,15 +172,20 @@ jobs:
                 echo "### Template update — workflow files only"
                 echo ""
                 echo "The template changed only GitHub Actions workflow files, which this"
-                echo "automation cannot push (GitHub blocks it). Copy them across by hand:"
+                echo "automation cannot push — GitHub never lets it write \`.github/workflows/\`."
+                echo "Open each pair of links, copy the template's version over yours, commit:"
                 echo ""
-                echo '```'
-                echo "$WF_CHANGED"
-                echo '```'
+                echo "$WF_HELP"
+                echo "To stop doing this by hand, see \`TEMPLATE_PAT\` in SETUP.md."
               } >> "$GITHUB_STEP_SUMMARY"
               echo "::warning::The template updated only workflow files — see the run summary to copy them by hand."
             else
               echo "Already up to date with the template — nothing to do."
+              {
+                echo "### Already up to date"
+                echo ""
+                echo "The template has nothing new for you. Your page is unchanged."
+              } >> "$GITHUB_STEP_SUMMARY"
             fi
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -156,16 +222,21 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm verify
 
-      - name: Push and open a pull request
+      - name: Publish it — direct to main, or as a pull request
         if: steps.merge.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          # The validated TEMPLATE_PAT when there is one — it is the only credential that
+          # may write .github/workflows/, and using it for `gh` too means the pull request
+          # comes from you, so CI actually runs on it. Otherwise the automation token.
+          GH_TOKEN: ${{ steps.pat.outputs.ok == 'true' && secrets.TEMPLATE_PAT || github.token }}
+          PAT_IN_USE: ${{ steps.pat.outputs.ok == 'true' }}
           REPO: ${{ github.repository }}
           BRANCH: ${{ steps.merge.outputs.branch }}
           BASE: ${{ steps.merge.outputs.base }}
           SHA: ${{ steps.merge.outputs.sha }}
-          WF_CHANGED: ${{ steps.merge.outputs.wf_changed }}
+          WF_HELP: ${{ steps.merge.outputs.wf_help }}
           UPSTREAM: ${{ inputs.upstream }}
+          DIRECT: ${{ inputs.direct }}
         run: |
           set -euo pipefail
           # Push the exact verified commit by SHA (not the local branch ref) via a tokened
@@ -175,30 +246,107 @@ jobs:
           # run may have left it behind (merged, abandoned, or never PR'd) and its
           # history is deliberately disposable. Still a pinned SHA, so what gets
           # published is exactly what the verify step checked.
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
-            "${SHA}:refs/heads/${BRANCH}"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          if ! git push --force "$REMOTE" "${SHA}:refs/heads/${BRANCH}"; then
+            if [ "${PAT_IN_USE:-false}" = "true" ]; then
+              # The token authenticated (checked before the merge) but cannot push. By far
+              # the likeliest cause is the one permission this whole feature is about.
+              echo "::error::Your TEMPLATE_PAT could not push. It most likely lacks Workflows (read and write) — add that permission, or delete the secret to go back to copying workflow files by hand. Nothing was published."
+            fi
+            exit 1
+          fi
+
+          # `direct`: apply to the default branch instead of asking for a review
+          # (ADR-041). The branch above is pushed first either way, so a refused
+          # fast-forward or a protected main costs nothing — we fall through to the
+          # pull request with the update already safe on its branch.
+          if [ "${DIRECT:-false}" = "true" ]; then
+            # No --force: main is yours. If it moved since checkout, or a branch rule
+            # says no, the push is refused and the pull request path takes over.
+            if git push "$REMOTE" "${SHA}:refs/heads/${BASE}"; then
+              # A push made with GITHUB_TOKEN cannot start another workflow run, so
+              # `on: push` never sees this one and the page would sit on its old build.
+              # workflow_dispatch is the documented exception to that rule — kick the
+              # deploy explicitly. A repo that publishes some other way (Vercel, a
+              # custom domain pipeline) simply has no such workflow; say so rather
+              # than fail, the code is already applied.
+              DEPLOY="The Pages deploy is running now — your page updates in a minute or two."
+              if ! git cat-file -e "${SHA}:.github/workflows/deploy-pages.yml" 2>/dev/null; then
+                DEPLOY="This repo has no Pages deploy workflow, so publish it the way you normally do."
+              elif [ "${PAT_IN_USE:-false}" = "true" ]; then
+                # A PAT is not GITHUB_TOKEN, so `on: push` fires for it normally. Dispatching
+                # as well would just queue a second, identical deploy behind the first.
+                :
+              else
+                gh workflow run deploy-pages.yml --ref "$BASE" \
+                  || DEPLOY="Applied, but the deploy could not be started automatically — run **Deploy to GitHub Pages** from the Actions tab."
+              fi
+              {
+                echo "### Template update applied to \`${BASE}\`"
+                echo ""
+                echo "\`pnpm verify\` passed on the merge, so it went straight to your"
+                echo "default branch — no pull request, because you asked for **direct**."
+                echo ""
+                echo "$DEPLOY"
+                echo ""
+                echo "Your \`chai.config.yaml\` and everything in \`public/\` are untouched."
+                echo "To undo it: revert commit \`${SHA}\` on \`${BASE}\`."
+                # Without a PR body to carry it, this is the only place the stripped
+                # workflow list can appear.
+                if [ -n "$(printf '%s' "$WF_HELP" | tr -d '[:space:]')" ]; then
+                  echo ""
+                  echo "⚠️ These workflow files also changed upstream and were **not**"
+                  echo "applied — GitHub never lets automation write \`.github/workflows/\`."
+                  echo "Copy each one across if you want it:"
+                  echo ""
+                  echo "$WF_HELP"
+                  echo "To stop doing this by hand, see \`TEMPLATE_PAT\` in SETUP.md."
+                fi
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::warning::Could not apply directly to ${BASE} (it moved, or a branch rule blocks it) — opening a pull request instead."
+          fi
+
+          # A green run means "the update is ready", NOT "the update is live" — the
+          # creator still has to merge. Saying so on every successful run is the whole
+          # point of this summary: a tick with no next step reads as "done", and the
+          # creator goes looking for changes on their page that are sitting on a branch.
+          ready_summary() {
+            {
+              echo "### Template update is ready — one merge away"
+              echo ""
+              echo "$2"
+              echo ""
+              echo "$1"
+              echo ""
+              echo "\`pnpm verify\` passed on the merged code. **Your page has not changed"
+              echo "yet** — review the diff and merge it, and your page redeploys itself."
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
 
           # The force-push has already updated any pull request open on this branch, so
           # creating a second one would just fail. Reuse it and say so.
           EXISTING="$(gh pr list --head "$BRANCH" --state open --json url -q '.[0].url' 2>/dev/null || true)"
           if [ -n "$EXISTING" ]; then
             echo "Updated the pull request already open on $BRANCH: $EXISTING"
+            ready_summary "$EXISTING" "The pull request already open for this update now has the latest template:"
             exit 0
           fi
 
           BODY="Automated update from the template \`$UPSTREAM\`.
 
-          Your \`chai.config.yaml\` and \`public/\` were kept exactly as they are — only the template's code changed. \`pnpm verify\` passed on the merge.
+          Your \`chai.config.yaml\` is untouched, and every file you have in \`public/\` was kept exactly as it is — your avatar, your social card, your CNAME. The template may *add* a new file there; it can never overwrite or delete yours. \`pnpm verify\` passed on the merge.
 
           Review the diff and merge when it looks good. (If you have edited component source yourself, those files were overwritten with the template's — that path is for creators who only edit config; a developer resolves their own merges.)"
 
-          if [ -n "$(printf '%s' "$WF_CHANGED" | tr -d '[:space:]')" ]; then
+          if [ -n "$(printf '%s' "$WF_HELP" | tr -d '[:space:]')" ]; then
             BODY="$BODY
 
-          ⚠️ The template also changed these workflow files, which this PR does **not** include — GitHub blocks automated pushes to \`.github/workflows/\`. Copy them across by hand if you want the changes:
-          \`\`\`
-          $WF_CHANGED
-          \`\`\`"
+          ⚠️ The template also changed these workflow files, which this PR does **not** include — GitHub never lets automation write \`.github/workflows/\`. Open each pair of links, copy the template's version into yours, and commit:
+
+          $WF_HELP
+          To stop doing this by hand, see \`TEMPLATE_PAT\` in SETUP.md."
           fi
 
           # Opening the PR needs the repository's "Allow GitHub Actions to create and
@@ -208,13 +356,19 @@ jobs:
           # point the merge is already pushed and verified, so the work is not lost:
           # hand back a one-click link instead of a red X (ADR-031's no-terminal
           # promise has to survive its own last step).
-          if gh pr create \
+          if PR_OUT="$(gh pr create \
             --base "$BASE" \
             --head "$BRANCH" \
             --title "Update from template ($UPSTREAM)" \
-            --body "$BODY"; then
+            --body "$BODY" 2>&1)"; then
+            echo "$PR_OUT"
+            PR_URL="$(printf '%s\n' "$PR_OUT" | grep -Eo 'https://[^[:space:]]+/pull/[0-9]+' | tail -n1)"
+            ready_summary "${PR_URL:-See the Pull requests tab.}" "A pull request with the latest template is open on your repo:"
             exit 0
           fi
+          # Keep gh's own error in the log — the summary below explains the usual cause,
+          # but a different failure should still be readable.
+          echo "$PR_OUT"
 
           COMPARE="${GITHUB_SERVER_URL}/${REPO}/compare/${BASE}...${BRANCH}?expand=1"
           {
@@ -224,7 +378,8 @@ jobs:
             echo "failed: this repository does not let GitHub Actions open pull"
             echo "requests, so the branch was pushed but no PR was created."
             echo ""
-            echo "**Nothing is lost — open it yourself:**"
+            echo "**Your page has not changed yet, and nothing is lost — open the pull"
+            echo "request yourself, then merge it:**"
             echo ""
             echo "$COMPARE"
             echo ""
@@ -232,4 +387,4 @@ jobs:
             echo "Workflow permissions → tick *Allow GitHub Actions to create and"
             echo "approve pull requests* → Save. Future runs will open the PR for you."
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "::warning::Branch pushed and verified, but this repo blocks Actions from opening PRs — see the run summary for a one-click link."
+          echo "::warning::Update ready but NOT applied: this repo blocks Actions from opening PRs, so the branch was pushed without one — see the run summary for a one-click link."
