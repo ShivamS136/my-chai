@@ -97,7 +97,7 @@ Your repo ships a **Set up PostHog dashboard** workflow. Actions tab → pick it
 
 EU is preselected. If you signed up on US cloud, switch the dropdown — a wrong region here fails loudly with a 401, so you will know.
 
-**One-time:** add your personal API key as a repository **secret** named `POSTHOG_PERSONAL_API_KEY` (Settings → Secrets and variables → Actions → **Secrets**), scoped to `dashboard:write` + `insight:write`.
+**One-time:** add your personal API key as a repository **secret** named `POSTHOG_PERSONAL_API_KEY` (Settings → Secrets and variables → Actions → **Secrets**). Create it with **Scoped access** limited to the one project, and only `Dashboard` and `Insight` set to **Write** — those four calls (list/create a dashboard, list/create/update its insights) are the entire blast radius. `Write` covers read, so no separate read scopes are needed. `SETUP.md` walks a creator through the same screen.
 
 It has to be a *secret* — not a variable, which anyone who can see the repo can read, and not a workflow input, since inputs are echoed into the run UI and logs. That is how keys leak. Optionally set a `POSTHOG_PROJECT_ID` repository **variable** so later runs need nothing typed at all.
 
@@ -112,7 +112,7 @@ POSTHOG_HOST=https://eu.posthog.com \
 node scripts/posthog-dashboard.mjs
 ```
 
-- **Key type matters:** this needs a *personal API key* (PostHog → Settings → Personal API keys) with `dashboard:write` + `insight:write` scopes — **not** the project key (`phc_...`) used by the page for capturing. Create the key, run the script once, then delete the key if you like; the dashboard persists.
+- **Key type matters:** this needs a *personal API key* (PostHog → Settings → Personal API keys) with `dashboard:write` + `insight:write` and nothing else, scoped to the single project — **not** the project key (`phc_...`) used by the page for capturing. Create the key, run the script once, then delete the key if you like; the dashboard persists.
 - Project ID: PostHog → Settings → Project → "Project ID", or `GET /api/projects/`.
 - Host: `https://eu.posthog.com` (the default) or `https://us.posthog.com` — match where you signed up — or your self-hosted URL. This is the **app** host, which is not the ingestion host your page config uses (`eu.i.posthog.com`, note the `.i.`). Mixing them up is the most common way this script fails, so it checks and tells you.
 - **Idempotent:** the script tags the dashboard `buy-me-a-chai`; re-running finds it and updates insights instead of duplicating.
