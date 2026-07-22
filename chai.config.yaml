@@ -39,16 +39,19 @@ works:
       Donors pay you directly over UPI — scan a QR, copy your UPI ID, or one-tap into their UPI app. 
       No middleman ever touches the money, so no one can take a cut.
     url: https://github.com/ShivamS136/buy-me-a-chai
+    image: /buy-me-a-chai-logo.png
   - title: Epoch Buddy
     description:
       A browser extension that converts epoch timestamps into human-readable dates (and vice-versa) -- from any web page selection or the extension popup.
       Equipped with advanced tools related to epoch conversion like relative conversion, history and general like dark mode, history etc.
     url: https://shivams136.github.io/epoch-buddy/
+    url: /epoch-buddy-logo.png
   - title: Tashn
     description:
       A Webapp to keep scores and stats of multiple sports within your group to brag about later.
       A lot of cool features are lined up next.
     url: https://tashn.app/?utm_source=buy-me-a-chai
+    image: /tashn-logo.png
 
 chai:
   # The one-tap chips: up to 4 named tiers, each with its own rupee amount. Name them

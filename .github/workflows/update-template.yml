@@ -65,7 +65,12 @@ jobs:
           git remote add upstream "https://github.com/$UPSTREAM.git"
           git fetch --no-tags --quiet upstream
 
-          BRANCH="template-update-$(date +%Y%m%d%H%M%S)"
+          # One fixed branch, force-pushed below — not a timestamped one per run.
+          # Timestamped branches orphaned a branch every time a run failed or could not
+          # open its pull request, so a creator accumulated `template-update-*` refs and
+          # had to work out which was current. Re-running now rewrites this same branch
+          # and updates any open pull request in place, the way dependency bots do.
+          BRANCH="template-update"
           git switch -c "$BRANCH"
 
           # Prefer the template for code conflicts (-X theirs); --allow-unrelated-histories
@@ -166,8 +171,20 @@ jobs:
           # Push the exact verified commit by SHA (not the local branch ref) via a tokened
           # URL. The token exists only in this step, after the untrusted verify step has
           # finished, and pushing the pinned SHA means a tampered local ref cannot be published.
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
+          # --force because BRANCH is the single, bot-owned update branch: an earlier
+          # run may have left it behind (merged, abandoned, or never PR'd) and its
+          # history is deliberately disposable. Still a pinned SHA, so what gets
+          # published is exactly what the verify step checked.
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
             "${SHA}:refs/heads/${BRANCH}"
+
+          # The force-push has already updated any pull request open on this branch, so
+          # creating a second one would just fail. Reuse it and say so.
+          EXISTING="$(gh pr list --head "$BRANCH" --state open --json url -q '.[0].url' 2>/dev/null || true)"
+          if [ -n "$EXISTING" ]; then
+            echo "Updated the pull request already open on $BRANCH: $EXISTING"
+            exit 0
+          fi
 
           BODY="Automated update from the template \`$UPSTREAM\`.
 
