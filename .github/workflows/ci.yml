@@ -97,10 +97,16 @@ jobs:
           echo "✓ assets are rewritten under the Pages subpath"
 
       - name: Assert the social card is absolute and actually exists
+        # Canonical only (ADR-037, ADR-043). This asserts against *this repo's* example
+        # config and its own subpath, so in a creator's fork it tested their content
+        # against our expectations and went red for it — which is how it broke the first
+        # real fork the day it merged.
+        #
         # The head-injection path has no unit test — vite.config.ts is outside the
         # coverage include — and a typo'd ogImage produces no Vite warning at all,
         # so the card would silently 404 in every link preview. Crawlers need an
         # absolute URL (Meta's WhatsApp doc is explicit), which needs SITE_URL.
+        if: github.repository == 'ShivamS136/buy-me-a-chai'
         run: |
           SITE_URL=https://example.github.io BASE_PATH=/buy-me-a-chai/ pnpm build
           for tag in \
@@ -116,6 +122,32 @@ jobs:
           done
           test -f dist/og.png || { echo "::error::dist/og.png was not emitted."; exit 1; }
           echo "✓ social card is absolute, declared and shipped"
+
+      - name: Assert a config with no ogImage line still gets a card
+        # The rule that repairs every repo made before ADR-040: no `meta.ogImage`, but
+        # `public/og.png` on disk, must still emit the card. That is the exact shape of
+        # every existing fork's config, and nothing else in the suite has that shape —
+        # this repo's own example sets the line explicitly.
+        if: github.repository == 'ShivamS136/buy-me-a-chai'
+        run: |
+          cp chai.config.yaml "$RUNNER_TEMP/chai.config.yaml.bak"
+          trap 'cp "$RUNNER_TEMP/chai.config.yaml.bak" chai.config.yaml' EXIT
+          grep -q '^  ogImage:' chai.config.yaml || {
+            echo "::error::The example config no longer has an ogImage line to remove — this test is testing nothing."; exit 1; }
+          # Filtered out of the backup rather than edited in place: `sed -i` takes its
+          # backup suffix differently on GNU and BSD, and this file must come back exactly.
+          grep -v '^  ogImage:' "$RUNNER_TEMP/chai.config.yaml.bak" > chai.config.yaml
+          SITE_URL=https://example.github.io BASE_PATH=/buy-me-a-chai/ pnpm build
+          for tag in \
+            'og:image" content="https://example.github.io/buy-me-a-chai/og.png' \
+            'twitter:card" content="summary_large_image'
+          do
+            if ! grep -qF "$tag" dist/index.html; then
+              echo "::error::A config without ogImage lost its card — every pre-ADR-040 fork just went back to a bare text link. Missing: $tag"
+              exit 1
+            fi
+          done
+          echo "✓ the card defaults to /og.png with no config line"
 
       - name: Assert the placeholder guard rejects the shipped example
         # Canonical only (ADR-037): a creator replaces the example, so `check:placeholder`
