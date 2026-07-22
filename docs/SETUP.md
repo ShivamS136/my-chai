@@ -140,6 +140,22 @@ Would rather use a terminal, an AI agent, or build the charts yourself? Those ar
 
 **What is never collected.** No autocapture, no session recording, no heatmaps, no surveys. Just three events with fixed fields, and anything else is dropped before it leaves the browser ([details](./ANALYTICS.md)). Donor messages never leave their UPI app.
 
+### The personal key, and exactly what to tick
+
+A `phx_` key acts as *you* in PostHog, so make one that can do the two things this button needs and nothing else. In PostHog: **Settings → Personal API keys → Create personal API key**.
+
+| Field | What to choose | Why |
+|---|---|---|
+| Key name | Anything — `chai-dashboard` reads well six months later | It is only a label |
+| Organization & project access | The one project your page sends events to, **not** "All" | A key that can reach a single project can only ever damage that project |
+| Scopes | **Scoped access**, then set exactly two to **Write**: `Dashboard` and `Insight` | That is the whole job — list and create one dashboard, then list, create and update the charts on it |
+
+Leave every other scope on **No access**. Write already includes read, so you do not also tick `Dashboard: Read`. Skip "All access" — it works, but it gives a value living in your repo the power to change billing, invite members and edit project settings.
+
+Two things people trip on. This is **not** the `phc_` key from step 2: that one only sends events, is public by design, and goes in Variables. And the run form asks for your **project ID** — the number in your PostHog URL after `/project/` — which you can either type in each time or save once as a `POSTHOG_PROJECT_ID` variable.
+
+You can delete the key the moment the run finishes; the dashboard it built stays. If you deleted it and want to change the charts later, make a new one the same way.
+
 ## Every secret and variable, in one place
 **A working page needs none of these.** Everything that makes the page *yours* lives in `chai.config.yaml`. This list exists so you can look up a name you saw in a workflow or a log without hunting.
 
@@ -153,8 +169,8 @@ If you're ever unsure which tab, use **Secrets**. The cost of over-protecting a 
 | Name | Tab | You need it when | What it does |
 |---|---|---|---|
 | `VITE_POSTHOG_KEY` | Variables *(or Secrets)* | You turned on analytics | Your PostHog **project** key, the one starting `phc_`. It gets baked into the page, so it is public by design and cannot do anything but send events. Read at **build** time: set it, then push a commit, or the running site won't have it. Either tab works — the workflow checks Variables first. |
-| `POSTHOG_PERSONAL_API_KEY` | **Secrets** | You use the "Set up PostHog dashboard" button | Your **personal** key, starting `phx_`. This one can read and change your whole PostHog account, so it is a secret and never anything else. Used only by that button, never by your page. |
-| `POSTHOG_PROJECT_ID` | Variables | Optional, same button | Saves you typing the project number on every run. You can type it into the form instead. |
+| `POSTHOG_PERSONAL_API_KEY` | **Secrets** | You use the "Set up PostHog dashboard" button | Your **personal** key, starting `phx_`. It acts as you in PostHog, so it is a secret and never anything else. Give it `Dashboard: Write` + `Insight: Write` on one project and nothing more — [exactly what to tick](#the-personal-key-and-exactly-what-to-tick). Used only by that button, never by your page. |
+| `POSTHOG_PROJECT_ID` | Variables | Optional, same button | Saves you typing the project number on every run. It is the number in your PostHog URL after `/project/`. You can type it into the form instead. |
 | `CHAI_BASE_PATH` | Variables | You use a custom domain | Set it to `/`. Without it the build prefixes every file with your repo name and a custom domain serves a blank page. |
 | `CHAI_ALLOW_PLACEHOLDER` | Variables | You want to preview before you have a UPI ID | `1` turns the "you haven't filled in your details" deploy block into a warning. The page then carries a visible demo banner, because a page with the example UPI ID must never look real. Remove it before going live. |
 | `TEMPLATE_PAT` | **Secrets** | Optional, for updates | Lets template updates include workflow files. See the section above for exactly which permissions to give it. |

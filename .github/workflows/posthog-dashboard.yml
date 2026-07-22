@@ -84,9 +84,11 @@ jobs:
               echo ""
               echo "Settings → Secrets and variables → Actions → Secrets → **New repository secret**"
               echo ""
-              echo "Get it from PostHog → Settings → Personal API keys, with scopes"
-              echo '`dashboard:write` and `insight:write`. It starts `phx_` — this is'
-              echo 'not the `phc_` key your page uses to send events.'
+              echo "Get it from PostHog → Settings → Personal API keys → Create personal"
+              echo "API key. Scope it to this one project, choose **Scoped access**, and"
+              echo 'set only `Dashboard` and `Insight` to **Write** — leave the rest on'
+              echo 'No access. It starts `phx_` — this is not the `phc_` key your page'
+              echo 'uses to send events.'
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::error::POSTHOG_PERSONAL_API_KEY secret is not set — see the run summary."
             exit 1
