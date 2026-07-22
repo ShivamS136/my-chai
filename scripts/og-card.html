@@ -29,27 +29,39 @@
   }
   .eyebrow {
     font-family: Menlo, ui-monospace, monospace;
-    font-size: 27px;
+    font-size: 24px;
     font-weight: 700;
-    letter-spacing: 0.17em;
+    letter-spacing: 0.18em;
   }
   .display {
     font-family: Superclarendon, Charter, Georgia, serif;
-    font-size: 106px;
+    font-size: 140px;
     font-weight: 700;
     letter-spacing: -0.015em;
+  }
+  .body {
+    font-family: 'Avenir Next', 'Helvetica Neue', sans-serif;
+    font-size: 31px;
+    font-weight: 500;
   }
 </style>
 
 <!--
-  Geometry notes, so a future edit does not break the idea:
-  * The waterline is a shallow convex arc, not a straight rule — a straight rule
-    reads as a two-tone background, the arc reads as the surface of a liquid.
-  * "arrives whole." is drawn TWICE at identical coordinates: once in ink clipped
-    to the region above the arc, once in cream clipped to below. The letters change
-    colour exactly at the waterline. That inversion is the whole card.
-  * The accent meniscus is stroked LAST, over the glyphs, so the surface is one
-    continuous line rather than something the text sits behind.
+  Design notes, so a future edit does not break the idea:
+  * The wordmark IS the message: "Buy Me a Chai" is both the product brand and,
+    read next to og:title ("Buy {name} a chai"), the literal ask. The eyebrow
+    says out loud what the page is for — SUPPORT MY WORK — in the creator's
+    voice, because the creator is the one sharing the link.
+  * The glass is drawn bold-outline, sticker-flat, so it survives 340px. The
+    facet band on its lower half is what makes it a cutting-chai glass and not
+    a generic cup; the ridges taper with the glass and are spaced by angle so
+    they crowd toward the edges like a real pressed tumbler.
+  * The steam is one continuous line that ties itself into a heart — gratitude
+    rising, crowning the glass in accent. (A rupee sign in the
+    steam was considered and rejected: rupees evaporating is the exact opposite
+    of "every rupee arrives whole".)
+  * The accent meniscus ring on the tea surface carries over from the previous
+    card — it is the brand gesture, the surface of the chai drawn in accent.
 -->
 <svg
   width="1200"
@@ -59,73 +71,107 @@
   shape-rendering="geometricPrecision"
   text-rendering="geometricPrecision"
 >
-  <title>Buy me a chai — every rupee arrives whole, 0% commission, straight to UPI</title>
+  <title>
+    Buy Me a Chai — support my work, straight to UPI. A cutting-chai glass with
+    steam curling into a heart; every rupee arrives whole, 0% commission.
+  </title>
 
   <defs>
-    <!-- Everything above the waterline. -->
-    <clipPath id="above">
-      <path d="M0,0 H1200 V426 Q600,406 0,426 Z" />
-    </clipPath>
-    <!-- Everything below it. -->
-    <clipPath id="below">
-      <path d="M0,426 Q600,406 1200,426 V630 H0 Z" />
-    </clipPath>
-    <!-- Tea darkens with depth, so the lower band is not a flat slab. -->
-    <linearGradient id="brew" x1="0" y1="406" x2="0" y2="630" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#8C3D18" />
-      <stop offset="1" stop-color="#5E2409" />
+    <!-- Tea darkens with depth. -->
+    <linearGradient id="brew" x1="0" y1="248" x2="0" y2="547" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A9612F" />
+      <stop offset="1" stop-color="#7A3A12" />
     </linearGradient>
-    <!-- Curvature. Edge falloff is what makes a flat fill read as a cylinder —
-         without it the ridges below are just stripes. -->
-    <linearGradient id="curve" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#2B1109" stop-opacity="0.42" />
-      <stop offset="0.22" stop-color="#2B1109" stop-opacity="0.06" />
-      <stop offset="0.5" stop-color="#2B1109" stop-opacity="0" />
-      <stop offset="0.78" stop-color="#2B1109" stop-opacity="0.06" />
-      <stop offset="1" stop-color="#2B1109" stop-opacity="0.42" />
+    <!-- The gloss streak fades in and out so it ends nowhere in particular. -->
+    <linearGradient id="shine" x1="868" y1="228" x2="890" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0" />
+      <stop offset="0.2" stop-color="#ffffff" stop-opacity="0.38" />
+      <stop offset="0.75" stop-color="#ffffff" stop-opacity="0.38" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
     </linearGradient>
+    <!-- The tea inside the glass: body + base cap. Ridges and shine clip to it. -->
+    <clipPath id="tea">
+      <path d="M850,248 L874,535 L1026,535 L1050,248 Z" />
+      <ellipse cx="950" cy="535" rx="76" ry="12" />
+    </clipPath>
+    <!-- The whole glass interior, tea and air alike — for the shine streak. -->
+    <clipPath id="glass">
+      <path d="M846,200 L874,535 L1026,535 L1054,200 Z" />
+      <ellipse cx="950" cy="535" rx="76" ry="12" />
+    </clipPath>
   </defs>
 
   <rect width="1200" height="630" fill="#faf8f4" />
 
-  <!-- The chai. Steeped accent, not the page accent: this file is fixed for
-       every clone, so it cannot follow a creator's theme.accent. -->
-  <path d="M0,426 Q600,406 1200,426 V630 H0 Z" fill="url(#brew)" />
+  <!-- ============ right column: the glass ============ -->
 
-  <g clip-path="url(#below)">
-    <rect width="1200" height="630" fill="url(#curve)" />
+  <!-- A quiet warm disc seats the glass so the right column holds together
+       at thumbnail size. -->
+  <circle cx="950" cy="355" r="235" fill="#f3ede2" />
+  <ellipse cx="952" cy="549" rx="118" ry="14" fill="#1a130e" opacity="0.07" />
 
-    <!-- The ridges of a cutting-chai glass — the one detail that tells it apart
-         from any other cup, and the reason this card is a glass rather than two
-         tones. Only in the tea, because that is where you would see them; the
-         cream above is air. Spaced evenly by ANGLE around the cylinder rather
-         than by distance, so they crowd toward the edges the way real ridges do.
-         Drawn under the type on purpose: physically the letters are in the glass
-         too, but darkening them at the edges costs more legibility than the
-         realism is worth at 340px. -->
-    <g stroke="#faf8f4" stroke-width="3" opacity="0.08">
-      <path d="M50.3,406 V630" />
-      <path d="M152.2,406 V630" />
-      <path d="M283.9,406 V630" />
-      <path d="M436.5,406 V630" />
-      <path d="M600,406 V630" />
-      <path d="M763.5,406 V630" />
-      <path d="M916.1,406 V630" />
-      <path d="M1047.8,406 V630" />
-      <path d="M1149.7,406 V630" />
-    </g>
+  <!-- Empty glass reads lighter than the halo behind it. -->
+  <path d="M846,200 L874,535 L1026,535 L1054,200 Z" fill="#fdf8ee" opacity="0.55" />
+
+  <!-- The chai. -->
+  <path d="M850,248 L874,535 L1026,535 L1050,248 Z" fill="url(#brew)" />
+  <ellipse cx="950" cy="535" rx="76" ry="12" fill="#7A3A12" />
+
+  <!-- The facet band of a cutting-chai glass — the detail that tells it apart
+       from any other cup. Ridges taper with the glass and are spaced by angle
+       around the cylinder, so they crowd toward the edges. -->
+  <g clip-path="url(#tea)" stroke="#faf8f4" stroke-width="3" opacity="0.32" fill="none">
+    <path d="M863,390 Q950,399 1037,390" />
+    <path d="M873.7,390 L883.7,528" />
+    <path d="M905.95,390 L911.7,528" />
+    <path d="M950,390 L950,528" />
+    <path d="M994.05,390 L988.3,528" />
+    <path d="M1026.3,390 L1016.3,528" />
   </g>
 
-  <text x="88" y="108" class="eyebrow" fill="#6b5647">0% COMMISSION · STRAIGHT TO UPI</text>
-
-  <text x="88" y="306" class="display" fill="#1a130e">Every rupee</text>
-
-  <g clip-path="url(#above)">
-    <text x="88" y="446" class="display" fill="#1a130e">arrives whole.</text>
-  </g>
-  <g clip-path="url(#below)">
-    <text x="88" y="446" class="display" fill="#faf8f4">arrives whole.</text>
+  <!-- Glass shine. -->
+  <g clip-path="url(#glass)">
+    <path d="M868,228 L890,512" stroke="url(#shine)" stroke-width="15" stroke-linecap="butt" />
   </g>
 
-  <path d="M0,426 Q600,406 1200,426" fill="none" stroke="#C4622D" stroke-width="4" />
+  <!-- The surface of the chai, ringed in accent — the meniscus is the brand
+       gesture carried over from the previous card. -->
+  <ellipse cx="950" cy="248" rx="100" ry="16" fill="#BE7B45" stroke="#C4622D" stroke-width="4" />
+
+  <!-- Bold ink outline, sticker-flat, so the glass survives 340px. -->
+  <g stroke="#1a130e" stroke-width="5" stroke-linecap="round" fill="none">
+    <ellipse cx="950" cy="200" rx="104" ry="17" />
+    <path d="M846,200 L874,535" />
+    <path d="M1054,200 L1026,535" />
+  </g>
+  <path
+    d="M874,535 A76,12 0 0 0 1026,535"
+    fill="none"
+    stroke="#1a130e"
+    stroke-width="4.5"
+    stroke-linecap="round"
+  />
+
+  <!-- One continuous line of steam that ties itself into a heart. It floats
+       clear of the rim: the accent stroke never crosses the ink outline. -->
+  <path
+    d="M934,172 C924,150 982,144 962,112 C924,90 926,52 962,68
+       C998,52 1000,90 962,112"
+    fill="none"
+    stroke="#C4622D"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- ============ left column: the words ============ -->
+
+  <text x="88" y="118" class="eyebrow" fill="#1a130e">SUPPORT MY WORK · STRAIGHT TO UPI</text>
+
+  <text x="88" y="270" class="display" fill="#1a130e">Buy <tspan dx="-7">Me</tspan></text>
+  <text x="88" y="410" class="display" fill="#1a130e">a <tspan fill="#C4622D">Chai</tspan></text>
+
+  <text x="88" y="466" class="body" fill="#6b5647">
+    Every rupee arrives whole — 0% commission.
+  </text>
 </svg>
