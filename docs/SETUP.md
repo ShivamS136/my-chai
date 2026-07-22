@@ -66,11 +66,13 @@ Green? You're live. Share the link. ☕
 ## Keeping up with the template (optional)
 The template gets improvements — new payment-app fixes, features, dependency bumps. Most creators never need them: a static page that works doesn't rot. But when you *do* want them, you never touch a terminal.
 
-**Do this once:** new repos do not let Actions open pull requests. Go to **Settings → Actions → General → Workflow permissions**, tick **Allow GitHub Actions to create and approve pull requests**, and save. If you skip it the update still works — it just gives you a link to open the pull request yourself.
+**Do this once:** new repos do not let Actions open pull requests. Go to **Settings → Actions → General → Workflow permissions**, tick **Allow GitHub Actions to create and approve pull requests**, and save. If you skip it the update still works — the run just finishes with a link for you to open the pull request yourself, and it is easy to miss.
 
 1. Your repo → **Actions** tab → **Update from template** (left sidebar) → **Run workflow**.
 2. It merges the latest template, **keeps your `chai.config.yaml` and `public/` exactly as they are**, checks the result still builds, and opens a **pull request**.
 3. Review the diff, and **Merge** — your page redeploys automatically.
+
+A green tick on the run means the update is *ready*, not that it is live: the update sits on a branch until you merge the pull request. Every run tells you what is left to do in its summary — open **Actions** → the run, and read the box at the top.
 
 A few things to know:
 - It only ever changes template code, never your config or your assets — your UPI ID is safe.

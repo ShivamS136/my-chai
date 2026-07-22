@@ -8,9 +8,15 @@
   colour and no personal detail: the name lives in og:title/og:description,
   which are baked per-creator at build time by chaiHead() in vite.config.ts.
 
-  To regenerate after editing: open this file at exactly 1200x630 and screenshot
-  it, or run a headless browser at that viewport. Keep the PNG under ~300KB —
-  WhatsApp's cap is 600KB and it is the tightest of the four platforms.
+  To regenerate after editing, from the repo root:
+
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+      --disable-gpu --force-device-scale-factor=1 --hide-scrollbars \
+      --window-size=1200,630 --screenshot=public/og.png \
+      "file://$PWD/scripts/og-card.html"
+
+  Keep the PNG under ~300KB — WhatsApp's cap is 600KB and it is the tightest of
+  the four platforms.
 
   The bottom ~20% stays free of text on purpose: X crops the card to 2:1 and
   overlays the post headline across the lower edge.
@@ -48,8 +54,10 @@
 
 <!--
   Design notes, so a future edit does not break the idea:
-  * The wordmark IS the message: "Buy Me a Chai" is both the product brand and,
-    read next to og:title ("Buy {name} a chai"), the literal ask. The eyebrow
+  * The wordmark IS the message: "Buy Me A Chai" is both the product brand and,
+    set exactly as strings.brandName sets it in the masthead, so a visitor who
+    taps through from the card meets the same wordmark. Read next to og:title
+    ("Buy {name} a chai"), it is also the literal ask. The eyebrow
     says out loud what the page is for — SUPPORT MY WORK — in the creator's
     voice, because the creator is the one sharing the link.
   * The glass is drawn bold-outline, sticker-flat, so it survives 340px. The
@@ -72,7 +80,7 @@
   text-rendering="geometricPrecision"
 >
   <title>
-    Buy Me a Chai — support my work, straight to UPI. A cutting-chai glass with
+    Buy Me A Chai — support my work, straight to UPI. A cutting-chai glass with
     steam curling into a heart; every rupee arrives whole, 0% commission.
   </title>
 
@@ -166,12 +174,20 @@
 
   <!-- ============ left column: the words ============ -->
 
-  <text x="88" y="118" class="eyebrow" fill="#1a130e">SUPPORT MY WORK · STRAIGHT TO UPI</text>
+  <text x="88" y="98" class="eyebrow" fill="#1a130e">SUPPORT MY WORK · STRAIGHT TO UPI</text>
 
-  <text x="88" y="270" class="display" fill="#1a130e">Buy <tspan dx="-7">Me</tspan></text>
-  <text x="88" y="410" class="display" fill="#1a130e">a <tspan fill="#C4622D">Chai</tspan></text>
+  <!-- Baselines are spaced by hand, not by line-height: 98 → 258 → 416 → 494.
+       The two display lines sit 158px apart (1.13× the 140px face) so "Buy"'s
+       descender clears "A Chai"'s cap line. The eyebrow and the subline stand
+       further off than that — 62px and 56px of clear space to the nearest cap
+       line, against 34px inside the wordmark — because they are captions to the
+       wordmark, not lines of it, and the gap is what says so. The subline's
+       descenders land at ~502, still clear of the bottom 20% X crops over; that
+       ceiling is why the whole block rides up rather than the subline down. -->
+  <text x="88" y="258" class="display" fill="#1a130e">Buy <tspan dx="-7">Me</tspan></text>
+  <text x="88" y="416" class="display" fill="#1a130e">A <tspan fill="#C4622D">Chai</tspan></text>
 
-  <text x="88" y="466" class="body" fill="#6b5647">
+  <text x="88" y="494" class="body" fill="#6b5647">
     Every rupee arrives whole — 0% commission.
   </text>
 </svg>
