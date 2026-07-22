@@ -41,7 +41,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - uses: actions/configure-pages@v5
+      - id: pages
+        uses: actions/configure-pages@v5
 
       - name: Build
         # `build:deploy` runs the placeholder guard first (ADR-013), so a fork that
@@ -55,6 +56,13 @@ jobs:
           # (Settings → Secrets and variables → Actions → Variables) — and remember
           # the CNAME file belongs in public/, which Vite copies into dist verbatim.
           BASE_PATH: ${{ vars.CHAI_BASE_PATH || format('/{0}/', github.event.repository.name) }}
+          # The page's own origin, read straight from the Pages API by the step
+          # above — so it follows a custom domain, gets the owner's capitalisation
+          # right, and is identical on push and workflow_dispatch. Social crawlers
+          # need an absolute og:image (WhatsApp's docs say so outright), and this is
+          # the only way a static build can know it. Unset on other hosts, where the
+          # build falls back to relative paths and omits og:url rather than guessing.
+          SITE_URL: ${{ steps.pages.outputs.origin }}
           # Optional, and public by nature: a PostHog *project* key (phc_…) only
           # allows writing events. `vars` is the documented home for it; `secrets` is
           # accepted too, because that is where people put anything key-shaped.

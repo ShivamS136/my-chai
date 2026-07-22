@@ -549,7 +549,9 @@ const metaSchema = z
       .describe('Meta description for search results and social cards.')
       .optional(),
     ogImage: assetPath()
-      .describe('Social-share image. Use an absolute https:// URL for reliable crawler previews.')
+      .describe(
+        'The picture shown when your link is shared. Defaults to /og.png — replace public/og.png to use your own, 1200x630.',
+      )
       .optional(),
     language: z
       .string()

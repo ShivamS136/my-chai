@@ -188,7 +188,7 @@ jobs:
 
           BODY="Automated update from the template \`$UPSTREAM\`.
 
-          Your \`chai.config.yaml\` and \`public/\` were kept exactly as they are — only the template's code changed. \`pnpm verify\` passed on the merge.
+          Your \`chai.config.yaml\` is untouched, and every file you have in \`public/\` was kept exactly as it is — your avatar, your social card, your CNAME. The template may *add* a new file there; it can never overwrite or delete yours. \`pnpm verify\` passed on the merge.
 
           Review the diff and merge when it looks good. (If you have edited component source yourself, those files were overwritten with the template's — that path is for creators who only edit config; a developer resolves their own merges.)"
 

@@ -65,8 +65,16 @@ theme:
   accent: '#C4622D'
 
 meta:
-  # Defaults to `Buy {creator.name} a chai` when omitted.
-  description: Support my open-source work — 0% commission, direct UPI.
+  # Both default to your name: the tab title becomes `Buy {creator.name} a chai`,
+  # and the shared-link description names you too. Uncomment to write your own.
+  # title: Buy Your Name a chai
+  # description: Support my open-source work — 0% commission, direct UPI.
+  #
+  # The picture people see when your link is shared (WhatsApp, X, LinkedIn, Slack).
+  # To use your own, drop a 1200x630 image at public/og.png — no config change
+  # needed, and your file survives template updates. Point this elsewhere for a
+  # different filename, or delete the line for a link preview with no picture.
+  ogImage: /og.png
   language: en
 
 # Analytics is OFF by default: with no `analytics` block the page makes zero network

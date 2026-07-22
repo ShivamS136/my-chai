@@ -90,6 +90,27 @@ The masthead, grid and footer share a `max-w-[480px] lg:max-w-[1040px]` shell so
 - Never: "donation processed", "transaction successful", "secure payment gateway" (we are not a gateway).
 - Always disclose: "Payments go directly to the creator's UPI. No middleman, no fees."
 
+## The social card (`public/og.png`)
+
+The picture that appears when a page is shared — WhatsApp above all, then X, LinkedIn, Slack. One file serves every clone, so it carries no name, no accent colour and no amounts: **everything personal is text**, baked per-creator into the served HTML by `chaiHead()` (`og:title`, `og:site_name`, `og:description`). Making the picture per-creator would need a build step that renders images, which this project does not have and does not want.
+
+**The card is a cutting-chai glass** — not a picture of one. The 1200×630 frame *is* the glass, filled to the cutting line, with the display line half-submerged: above the waterline the letters are ink in clear glass, below it they invert to cream under tea. The waterline is a shallow convex arc rather than a straight rule, because a straight rule reads as a two-tone background and an arc reads as a liquid surface. The brew field carries vertical ridges spaced evenly *by angle* around a cylinder, so they crowd toward the edges, plus edge falloff — the ridges are the one detail that distinguishes a cutting-chai glass from any other cup, and the falloff is what makes them read as curvature instead of stripes.
+
+The copy is the point of the joke: a cutting is half a glass, so the chai gets cut — **"Every rupee arrives whole."** does not. The eyebrow is `strings.disclosure` verbatim, so the card and the page it previews say the identical sentence.
+
+Constraints any redesign must keep:
+
+| Constraint | Why |
+|---|---|
+| Exactly 1200×630, PNG, no alpha | The one size that clears Facebook (≥1200×630), LinkedIn (≥1200×627), X and WhatsApp at once. Previews composite against light or dark chat bubbles, so transparency renders unpredictably. No crawler accepts SVG |
+| Under ~300 KB | WhatsApp's 600 KB cap is the tightest by an order of magnitude |
+| Bottom ~20% free of text | X crops to 2:1 and overlays the post headline across the lower edge |
+| Legible at 340px wide | WhatsApp's render width. Anything under ~40px type at full size is texture, not copy — put nothing load-bearing there |
+| No creator name, no amounts, no accent | One file, every clone. `chai.presets` are creator-configurable, so a price on the card would advertise a tier the page may not offer |
+| No QR, no receipt, no confirmation | Hard rule 2 — and a QR-shaped mark on a payment card invites scanning something that is not a payment |
+
+A creator replaces `public/og.png` with their own 1200×630 file; no config edit, and `update-template.yml` restores `public/` verbatim so it survives template pulls. Source and regeneration steps: `scripts/og-card.html`.
+
 ## v1 widget notes (forward-looking, don't build in v0)
 - The payment card section above becomes `<chai-widget>` — that's why it's a self-contained 480px card with its own tokens.
 - Redirect-button embed inherits accent color; inline embed opens the card in a popover anchored to the button.

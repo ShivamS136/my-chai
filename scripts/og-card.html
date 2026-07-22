@@ -1,0 +1,131 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>og-card source — buy-me-a-chai</title>
+<!--
+  Source for public/og.png — the social card every page shares (ADR-040).
+
+  One image serves every clone, so it carries no creator name, no accent
+  colour and no personal detail: the name lives in og:title/og:description,
+  which are baked per-creator at build time by chaiHead() in vite.config.ts.
+
+  To regenerate after editing: open this file at exactly 1200x630 and screenshot
+  it, or run a headless browser at that viewport. Keep the PNG under ~300KB —
+  WhatsApp's cap is 600KB and it is the tightest of the four platforms.
+
+  The bottom ~20% stays free of text on purpose: X crops the card to 2:1 and
+  overlays the post headline across the lower edge.
+
+  Fonts are macOS system faces only, so this renders offline with no webfont.
+-->
+<style>
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: #faf8f4;
+  }
+  svg {
+    display: block;
+  }
+  .eyebrow {
+    font-family: Menlo, ui-monospace, monospace;
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: 0.17em;
+  }
+  .display {
+    font-family: Superclarendon, Charter, Georgia, serif;
+    font-size: 106px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+</style>
+
+<!--
+  Geometry notes, so a future edit does not break the idea:
+  * The waterline is a shallow convex arc, not a straight rule — a straight rule
+    reads as a two-tone background, the arc reads as the surface of a liquid.
+  * "arrives whole." is drawn TWICE at identical coordinates: once in ink clipped
+    to the region above the arc, once in cream clipped to below. The letters change
+    colour exactly at the waterline. That inversion is the whole card.
+  * The accent meniscus is stroked LAST, over the glyphs, so the surface is one
+    continuous line rather than something the text sits behind.
+-->
+<svg
+  width="1200"
+  height="630"
+  viewBox="0 0 1200 630"
+  xmlns="http://www.w3.org/2000/svg"
+  shape-rendering="geometricPrecision"
+  text-rendering="geometricPrecision"
+>
+  <title>Buy me a chai — every rupee arrives whole, 0% commission, straight to UPI</title>
+
+  <defs>
+    <!-- Everything above the waterline. -->
+    <clipPath id="above">
+      <path d="M0,0 H1200 V426 Q600,406 0,426 Z" />
+    </clipPath>
+    <!-- Everything below it. -->
+    <clipPath id="below">
+      <path d="M0,426 Q600,406 1200,426 V630 H0 Z" />
+    </clipPath>
+    <!-- Tea darkens with depth, so the lower band is not a flat slab. -->
+    <linearGradient id="brew" x1="0" y1="406" x2="0" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8C3D18" />
+      <stop offset="1" stop-color="#5E2409" />
+    </linearGradient>
+    <!-- Curvature. Edge falloff is what makes a flat fill read as a cylinder —
+         without it the ridges below are just stripes. -->
+    <linearGradient id="curve" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2B1109" stop-opacity="0.42" />
+      <stop offset="0.22" stop-color="#2B1109" stop-opacity="0.06" />
+      <stop offset="0.5" stop-color="#2B1109" stop-opacity="0" />
+      <stop offset="0.78" stop-color="#2B1109" stop-opacity="0.06" />
+      <stop offset="1" stop-color="#2B1109" stop-opacity="0.42" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="#faf8f4" />
+
+  <!-- The chai. Steeped accent, not the page accent: this file is fixed for
+       every clone, so it cannot follow a creator's theme.accent. -->
+  <path d="M0,426 Q600,406 1200,426 V630 H0 Z" fill="url(#brew)" />
+
+  <g clip-path="url(#below)">
+    <rect width="1200" height="630" fill="url(#curve)" />
+
+    <!-- The ridges of a cutting-chai glass — the one detail that tells it apart
+         from any other cup, and the reason this card is a glass rather than two
+         tones. Only in the tea, because that is where you would see them; the
+         cream above is air. Spaced evenly by ANGLE around the cylinder rather
+         than by distance, so they crowd toward the edges the way real ridges do.
+         Drawn under the type on purpose: physically the letters are in the glass
+         too, but darkening them at the edges costs more legibility than the
+         realism is worth at 340px. -->
+    <g stroke="#faf8f4" stroke-width="3" opacity="0.08">
+      <path d="M50.3,406 V630" />
+      <path d="M152.2,406 V630" />
+      <path d="M283.9,406 V630" />
+      <path d="M436.5,406 V630" />
+      <path d="M600,406 V630" />
+      <path d="M763.5,406 V630" />
+      <path d="M916.1,406 V630" />
+      <path d="M1047.8,406 V630" />
+      <path d="M1149.7,406 V630" />
+    </g>
+  </g>
+
+  <text x="88" y="108" class="eyebrow" fill="#6b5647">0% COMMISSION · STRAIGHT TO UPI</text>
+
+  <text x="88" y="306" class="display" fill="#1a130e">Every rupee</text>
+
+  <g clip-path="url(#above)">
+    <text x="88" y="446" class="display" fill="#1a130e">arrives whole.</text>
+  </g>
+  <g clip-path="url(#below)">
+    <text x="88" y="446" class="display" fill="#faf8f4">arrives whole.</text>
+  </g>
+
+  <path d="M0,426 Q600,406 1200,426" fill="none" stroke="#C4622D" stroke-width="4" />
+</svg>

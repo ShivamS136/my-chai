@@ -57,8 +57,9 @@ theme:
 meta:
   title: Buy Shivam a chai            # optional, defaults to `Buy {name} a chai`
   description: Support my open-source work — 0% commission, direct UPI.
-  ogImage: /og.png                    # optional; use an absolute https:// URL for reliable
-                                      # social cards (crawlers need one)
+                                      # optional; the default names you instead
+  ogImage: /og.png                    # the shared-link picture. Replace public/og.png
+                                      # with your own 1200x630 to change it
   language: en                        # reserved for future i18n
 
 # analytics:                          # optional — omit entirely to disable (the default).
@@ -129,6 +130,7 @@ editor). See ADR-016, ADR-030.
 - **Presence of the `analytics` block is a build-time signal, not just a runtime one:** it is read straight off the raw YAML to decide whether the PostHog chunk is emitted at all. That is why commenting the block out is meaningfully different from leaving it in place with no key — the first ships nothing, the second ships a chunk that never runs (ADR-028).
 - **`branding` defaults to the maker's (ADR-032):** so a fork inherits the template credit, and a maker changing their support URL propagates to forks on the next update. Overriding is a config edit; removing the links is a source edit, deliberately.
 - **`meta.language` reserved:** schema stability > YAGNI here; adding it later would be a breaking change for i18n adopters.
+- **The social card is one file, the words around it are yours (ADR-040):** `meta.ogImage` points at `/og.png`, so replacing `public/og.png` with your own 1200×630 image changes your link preview with no config edit — and `update-template.yml` restores `public/` verbatim, so your file survives template pulls. The *text* of the card is per-creator and baked into the served HTML at build: `og:title` becomes `Buy {your name} a chai`, `og:site_name` is your name, and `og:description` names you too unless you write your own. The picture cannot be per-creator without a build step that renders images, which this project does not have.
 
 ## Versioning
 

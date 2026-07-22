@@ -26,6 +26,7 @@ Open the file in GitHub's web editor (press `.` in your repo for the browser VS 
   decoration, so screen readers skip it and a chip without one is perfectly fine.
   The shipped ladder (₹20 / ₹50 / ₹100) is a fine starting point — rename it to your own shop.
 - Drop your photo at `public/avatar.png` (square, ≥ 256px) or remove the `avatar` line for an initials avatar.
+- **The shared-link picture** is already set up — `public/og.png` is what WhatsApp, X, LinkedIn and Slack show when someone shares your page. To use your own, replace that file with a 1200×630 image. Nothing to change in the config, and your version is kept when you pull template updates. The words beside it always say *your* name.
 
 Commit to `main`. Full field reference: [CONFIG.md](./CONFIG.md).
 
@@ -49,6 +50,8 @@ On **Vercel**, none of that applies: project Settings → Domains, and the base 
 
 ## Step 4 — Look at it
 Open your URL on your phone *and* a desktop. Check: name, avatar, amounts, and that the UPI ID shown next to the QR is **exactly yours**.
+
+Then send the link to yourself on WhatsApp. You should see a picture, your name, and a line about chai. If you get a bare link with no picture, see the troubleshooting table.
 
 ## Step 5 — The ₹1 self-test (do not skip)
 A typo'd-but-valid UPI ID sends every future donation to a stranger, unrecoverably. So:
@@ -135,6 +138,7 @@ Would rather use a terminal, an AI agent, or build the charts yourself? Those ar
 | Page is blank on Pages but fine on Vercel | You edited `vite.config.ts` `base` — revert; the workflow sets it automatically from your repo name. |
 | Page is blank on a **custom domain** | Missing step 3 of the custom-domain setup: set the `CHAI_BASE_PATH` repository variable to `/`, then re-run the deploy. |
 | Deployed, but PostHog shows nothing | Three causes, in order. **1.** The key is a build-time value, so it only applies to builds made *after* you added it — push a commit (or re-run the workflow) once `VITE_POSTHOG_KEY` is set. **2.** Check it starts with `phc_`. **3.** Check `analytics.host` matches your region (EU vs US). A key sent to the wrong region gets a `200 OK` and is then discarded — the page looks fine and the dashboard stays empty forever, so this one never announces itself. |
+| Shared link shows no picture | The picture needs a full `https://…` address, which the build only knows on GitHub Pages (it reads it from Pages itself) or when you set a `SITE_URL` environment variable — on Vercel, add `SITE_URL` with your site's address in project settings. Also check `meta.ogImage` is still in your `chai.config.yaml`: if your repo predates this feature, add `ogImage: /og.png` under `meta`. WhatsApp and Facebook cache previews for days, so test with a fresh link (add `?1` to the end) rather than re-sending the old one. |
 | "Pay with UPI app" does nothing on my phone | Known GPay/PhonePe limitation for browser payments to personal UPI IDs — not a bug in your page. Donors see the Copy-UPI-ID and QR fallbacks automatically. |
 | QR scans but amount is editable/absent in some app | Some apps treat P2P QR amounts as suggestions. Donor can type it; the note still carries through. |
 

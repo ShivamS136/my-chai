@@ -199,7 +199,7 @@
           "type": "string"
         },
         "ogImage": {
-          "description": "Social-share image. Use an absolute https:// URL for reliable crawler previews.",
+          "description": "The picture shown when your link is shared. Defaults to /og.png — replace public/og.png to use your own, 1200x630.",
           "type": "string"
         },
         "language": {
