@@ -45,7 +45,7 @@ works:
       A browser extension that converts epoch timestamps into human-readable dates (and vice-versa) -- from any web page selection or the extension popup.
       Equipped with advanced tools related to epoch conversion like relative conversion, history and general like dark mode, history etc.
     url: https://shivams136.github.io/epoch-buddy/
-    url: /epoch-buddy-logo.png
+    image: /epoch-buddy-logo.png
   - title: Tashn
     description:
       A Webapp to keep scores and stats of multiple sports within your group to brag about later.
