@@ -1,4 +1,4 @@
-import { closeSync, openSync, readSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readSync } from 'node:fs';
 import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -309,10 +309,18 @@ function chaiHead(): Plugin {
           const lang = escapeHtml(meta.language);
           const themeAttr =
             theme.mode === 'light' || theme.mode === 'dark' ? ` data-theme="${theme.mode}"` : '';
-          const ogImage =
-            meta.ogImage === undefined ? undefined : escapeHtml(absolute(meta.ogImage));
+          // The card is a file, not a setting: `public/og.png` ships with the template and
+          // `update-template.yml` restores `public/` verbatim, so every clone has one
+          // whether or not its config mentions it. Requiring the line meant every repo
+          // created before ADR-040 shared as a bare text card until its owner read a
+          // release note — a silent regression for doing nothing wrong. Defaulting only
+          // when the file is really there keeps the other direction honest: delete
+          // `public/og.png` and no `og:image` is claimed, rather than one that 404s.
+          const ogImagePath =
+            meta.ogImage ?? (existsSync(resolve('public', 'og.png')) ? '/og.png' : undefined);
+          const ogImage = ogImagePath === undefined ? undefined : escapeHtml(absolute(ogImagePath));
           const twitterCard = ogImage === undefined ? 'summary' : 'summary_large_image';
-          const size = meta.ogImage === undefined ? undefined : pngSize(meta.ogImage);
+          const size = ogImagePath === undefined ? undefined : pngSize(ogImagePath);
           // Trailing slash: `base` always ends in one, and GitHub Pages 301s the
           // slashless form while platforms cache and dedupe per exact URL.
           const canonical =
