@@ -550,7 +550,7 @@ const metaSchema = z
       .optional(),
     ogImage: assetPath()
       .describe(
-        'The picture shown when your link is shared. Defaults to /og.png — replace public/og.png to use your own, 1200x630.',
+        'The picture shown when your link is shared. Leave it out and /og.png is used whenever public/og.png exists — replace that file to use your own, 1200x630.',
       )
       .optional(),
     language: z

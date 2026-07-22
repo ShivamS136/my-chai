@@ -199,7 +199,7 @@
           "type": "string"
         },
         "ogImage": {
-          "description": "The picture shown when your link is shared. Defaults to /og.png — replace public/og.png to use your own, 1200x630.",
+          "description": "The picture shown when your link is shared. Leave it out and /og.png is used whenever public/og.png exists — replace that file to use your own, 1200x630.",
           "type": "string"
         },
         "language": {
