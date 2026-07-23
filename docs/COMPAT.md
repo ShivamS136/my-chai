@@ -8,12 +8,13 @@ Real-device results for each payment method. PR your findings — include app ve
 
 | App | QR | Upload | Deeplink | Deeplink carries amount? | Copy | Notes |
 |---|---|---|---|---|---|---|
-| Google Pay | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Known: browser intents to personal VPAs often silently blocked |
-| PhonePe | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Known: may show "exceeds limit for this merchant" |
-| Paytm | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| BHIM | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
+| Google Pay | ✅️ | ✅️ | ❌️ | ✅️ | ✅️ | Known: browser intents to personal VPAs often silently blocked |
+| PhonePe | ✅️ | ✅️ | ❌️ | ✅️ | ✅️ | Known: may show "exceeds limit for this merchant" |
+| Paytm | ✅️ | ✅️ | ❌️ | ✅️ | ✅️ | |
+| BHIM | ✅️ | ✅️ | ❌️ | ✅️ | ✅️ | |
 | CRED | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| Amazon Pay | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
+| Amazon Pay | ✅️ | ✅️ | ❌️ | ✅️ | ✅️ | |
+| Navi | ✅️ | ✅️ | ✅️ | ✅️ | ✅️ | |
 
 ## iOS (Safari)
 
